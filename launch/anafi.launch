@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+
+<launch>
+	<arg name="skycontroller" default="true"/>
+	<param name="skycontroller" type="boolean" value="$(arg skycontroller)" />
+	
+	<env name="ROSCONSOLE_FORMAT" value="[${severity}] [${time}] [${node}]: ${message}"/>
+
+	<node name="anafi" pkg="anafi_autonomy" type="anafi" output="screen"/>
+	
+	<node name="rviz" pkg="rviz" type="rviz" output="log" args=""/>
+	<node name="rqt_image_view" pkg="rqt_image_view" type="rqt_image_view" args="/anafi/image"/>	
+	<!-- Waits 1s before running dynamic_reconfigure -->
+	<node name="dynamic_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" output="screen" args="" launch-prefix="bash -c 'sleep 1; $0 $@' " />
+</launch>
