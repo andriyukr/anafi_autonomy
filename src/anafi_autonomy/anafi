@@ -447,7 +447,7 @@ class Anafi(threading.Thread):
 			yaw_frame_of_reference='none',
 			yaw=0.0,
 			pitch_frame_of_reference=self.gimbal_frame, # {'absolute', 'relative', 'none'}
-			pitch=msg.pitch, # (in position mode [-135,105])
+			pitch=-msg.pitch, # (in position mode [-135,105])
 			roll_frame_of_reference=self.gimbal_frame, # {'absolute', 'relative', 'none'}
 			roll=msg.roll)) # (in position mode [-38,38])
 				
