@@ -191,10 +191,10 @@ public:
                 camera_msg.roll = 1;
                 break;
             case KEYCODE_8: // roll up
-                camera_msg.pitch = 1;
+                camera_msg.pitch = -1;
                 break;
             case KEYCODE_2: // roll down
-                camera_msg.pitch = -1;
+                camera_msg.pitch = 1;
                 break;
 
                 /* camera commands */
