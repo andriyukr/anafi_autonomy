@@ -36,6 +36,7 @@ from olympe.messages.ardrone3.SpeedSettings import MaxVerticalSpeed, MaxRotation
 from olympe.messages.ardrone3.SpeedSettingsState import MaxVerticalSpeedChanged, MaxRotationSpeedChanged, MaxPitchRollRotationSpeedChanged
 from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged
 from olympe.messages.ardrone3.GPSState import NumberOfSatelliteChanged
+from olympe.messages.rth import return_to_home, set_ending_behavior, set_ending_hovering_altitude, set_min_altitude
 from olympe.messages.skyctrl.CoPiloting import setPilotingSource
 from olympe.messages.skyctrl.CoPilotingState import pilotingSource
 from olympe.messages.skyctrl.Common import AllStates
@@ -80,6 +81,7 @@ class Anafi(threading.Thread):
 		rospy.Subscriber("/anafi/takeoff", Empty, self.takeoff_callback)
 		rospy.Subscriber("/anafi/land", Empty, self.land_callback)
 		rospy.Subscriber("/anafi/emergency", Empty, self.emergency_callback)
+		rospy.Subscriber("/anafi/rtl", Empty, self.rtl_callback)
 		rospy.Subscriber("/anafi/offboard", Bool, self.offboard_callback)
 		rospy.Subscriber("/anafi/cmd_rpyt", PilotingCommand, self.rpyt_callback)
 		rospy.Subscriber("/anafi/cmd_moveto", MoveToCommand, self.moveTo_callback)
@@ -203,7 +205,7 @@ class Anafi(threading.Thread):
 		self.disconnect()
 						
 	def reconfigure_callback(self, config, level):
-		if level == -1 or level == 1:
+		if level == -1 or level == 1: # piloting related
 			self.drone(MaxTilt(config['max_tilt'])) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html?#olympe.messages.ardrone3.PilotingSettings.MaxTilt
 			self.drone(MaxVerticalSpeed(config['max_vertical_speed'])) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.SpeedSettings.MaxVerticalSpeed
 			self.drone(MaxRotationSpeed(config['max_yaw_rotation_speed'])) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.SpeedSettings.MaxRotationSpeed
@@ -216,7 +218,17 @@ class Anafi(threading.Thread):
 			self.max_horizontal_speed = config['max_horizontal_speed']
 			self.max_vertical_speed = config['max_vertical_speed']
 			self.max_rotation_speed = config['max_yaw_rotation_speed']
-		if level == -1 or level == 2:
+		if level == -1 or level == 2: # RTH related
+			self.drone(set_ending_behavior( # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.set_ending_behavior
+				ending_behavior='landing' if config['ending_behavior'] == 0 else 'hovering' # {'landing', 'hovering'}
+				))
+			self.drone(set_ending_hovering_altitude( # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.set_ending_hovering_altitude
+				altitude=config['hovering_altitude'] # AGL altitude (m)
+				))
+			self.drone(set_min_altitude( # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.set_min_altitude
+				altitude=config['min_altitude'] # ATO altitude (m)
+				))
+		if level == -1 or level == 3: # camera related
 			self.gimbal_frame = 'absolute' if config['gimbal_absolute'] else 'relative'
 			self.drone(gimbal.set_max_speed(
 				gimbal_id=0,
@@ -392,6 +404,11 @@ class Anafi(threading.Thread):
 		rospy.logfatal("Emergency!!!")
 		assert self.drone(Emergency()).wait().success() # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.Piloting.Emergency
 		
+	def rtl_callback(self, msg):		
+		rospy.loginfo("Return to Home")
+		assert self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0)).wait().success()
+		assert self.drone(return_to_home).wait().success() # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
+		
 	def offboard_callback(self, msg):
 		if msg.data == False:	
 			self.switch_manual()
@@ -426,7 +443,7 @@ class Anafi(threading.Thread):
 			latitude=msg.latitude, # latitude (degrees)
 			longitude=msg.longitude, # longitude (degrees)
 			altitude=msg.altitude, # altitude (m)
-			orientation_mode=HEADING_START, # orientation mode {TO_TARGET, HEADING_START, HEADING_DURING}
+			orientation_mode='heading_start', # orientation mode {'to_target', 'heading_start', 'heading_during'}
 			heading=msg.heading, # heading relative to the North (degrees)
 			max_horizontal_speed=self.max_horizontal_speed,
 			max_vertical_speed=self.max_vertical_speed,
@@ -448,7 +465,7 @@ class Anafi(threading.Thread):
 			yaw=0.0,
 			pitch_frame_of_reference=self.gimbal_frame, # {'absolute', 'relative', 'none'}
 			pitch=-msg.pitch, # (in position mode [-135,105])
-			roll_frame_of_reference=self.gimbal_frame, # {'absolute', 'relative', 'none'}
+			roll_frame_of_reference='relative', # {'absolute', 'relative', 'none'}
 			roll=msg.roll)) # (in position mode [-38,38])
 				
 	def take_photo(self, req):

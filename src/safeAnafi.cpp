@@ -170,10 +170,13 @@ void commandMetaCallback(const std_msgs::Int8& command_msg){
         emergency_publisher.publish(empty_msg);
         land = true;
         break;
-    case 6: // reset position and heading
+    case 6: // reset pose
         ROS_INFO("Reseting position and heading");
         position << 0, 0, 0;
         initial_yaw = yaw;
+        break;
+    case 7: // return-to-home
+        rth_publisher.publish(empty_msg);
         break;
     case 101: // remote control!
         offboard_msg.data = false;
@@ -223,17 +226,17 @@ void commandSkycontrollerCallback(const anafi_autonomy::SkyControllerCommand& co
 }
 
 void desiredPoseCallback(const anafi_autonomy::PoseCommand& command_msg){
-    desired_pose << command_msg.x, command_msg.y, command_msg.z, command_msg.yaw*M_PI/180;
+    command_offboard << command_msg.x, command_msg.y, command_msg.z, command_msg.yaw*M_PI/180;
     mode_offboard << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ANGLE;
 }
 
 void desiredVelocityCallback(const anafi_autonomy::VelocityCommand& command_msg){
-    desired_velocity << command_msg.vx, command_msg.vy, command_msg.vz, command_msg.yaw_rate;
+    command_offboard << command_msg.vx, command_msg.vy, command_msg.vz, command_msg.yaw_rate;
     mode_offboard << COMMAND_VELOCITY, COMMAND_VELOCITY, COMMAND_RATE;
 }
 
 void desiredAttitudeCallback(const anafi_autonomy::AttitudeCommand& command_msg){
-    desired_attitude << command_msg.roll*M_PI/180, command_msg.pitch*M_PI/180, command_msg.trottle, command_msg.yaw*M_PI/180;
+    command_offboard << command_msg.roll*M_PI/180, command_msg.pitch*M_PI/180, command_msg.trottle, command_msg.yaw*M_PI/180;
     mode_offboard << COMMAND_ANGLE, COMMAND_VELOCITY, COMMAND_ANGLE;
 }
 
@@ -255,7 +258,7 @@ void commandCameraCallback(const anafi_autonomy::KeyboardCameraCommand& command_
     anafi_autonomy::TakePhoto take_photo_srv;
     std_srvs::Empty empty_srv;
 
-	switch(command_msg.action){
+    switch(command_msg.action){
 	case 1:
         take_photo_client.call(take_photo_srv);
         break;
@@ -292,6 +295,7 @@ SafeAnafi::SafeAnafi(int argc, char** argv){
     emergency_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/emergency", 1);
     takeoff_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/takeoff", 1);
     land_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/land", 1);
+    rth_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/rth", 1);
     offboard_publisher = node_handle.advertise<std_msgs::Bool>("/anafi/offboard", 1);
     moveto_publisher = node_handle.advertise<anafi_autonomy::MoveToCommand>("/anafi/cmd_moveto", 1);
     moveby_publisher = node_handle.advertise<anafi_autonomy::MoveByCommand>("/anafi/cmd_moveby", 1);
@@ -370,7 +374,7 @@ void SafeAnafi::run(){
    (mode_skycontroller(0) != COMMAND_NONE ? mode_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? mode_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? mode_offboard(0) : COMMAND_VELOCITY))), 
    (mode_skycontroller(1) != COMMAND_NONE ? mode_skycontroller(1) : (mode_keyboard(1) != COMMAND_NONE ? mode_keyboard(1) : (mode_offboard(1) != COMMAND_NONE ? mode_offboard(1) : COMMAND_VELOCITY))), 
    (mode_skycontroller(2) != COMMAND_NONE ? mode_skycontroller(2) : (mode_keyboard(2) != COMMAND_NONE ? mode_keyboard(2) : (mode_offboard(2) != COMMAND_NONE ? mode_offboard(2) : COMMAND_RATE)));
-        
+
 		switch(mode_move(MODE_HORIZONTAL)){ // horizotal
 		case COMMAND_NONE: // no command
 			rpyg_msg.roll = 0;
@@ -488,14 +492,14 @@ void SafeAnafi::run(){
                 stop_zoom = true;
             }
             
-		geometry_msgs::Vector3Stamped acceleration_msg; // FOR DEBUG
+        geometry_msgs::Vector3Stamped acceleration_msg; // FOR DEBUG
         acceleration_msg.header.stamp = ros::Time::now(); // FOR DEBUG
         acceleration_msg.vector.x = acceleration(0); // FOR DEBUG
         acceleration_msg.vector.y = acceleration(1); // FOR DEBUG
         acceleration_msg.vector.z = acceleration(2); // FOR DEBUG
         acceleration_publisher.publish(acceleration_msg); // FOR DEBUG
         
-		geometry_msgs::Vector3Stamped mode_msg; // FOR DEBUG
+        geometry_msgs::Vector3Stamped mode_msg; // FOR DEBUG
         mode_msg.header.stamp = ros::Time::now(); // FOR DEBUG
         mode_msg.vector.x = mode_move(0); // FOR DEBUG
         mode_msg.vector.y = mode_move(1); // FOR DEBUG

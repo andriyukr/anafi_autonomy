@@ -72,6 +72,7 @@ Subscriber odometry_subscriber;
 Publisher emergency_publisher;
 Publisher takeoff_publisher;
 Publisher land_publisher;
+Publisher rth_publisher;
 Publisher offboard_publisher;
 Publisher moveto_publisher;
 Publisher moveby_publisher;

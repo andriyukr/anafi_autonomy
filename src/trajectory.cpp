@@ -58,7 +58,7 @@ void Trajectory::run(){
         // Main switch case
         switch(trajectory_type){
         case 0: // no command
-            pose << 0, 0, -1000, 0;
+            pose << 0, 0, 0, 0;
             velocity << 0, 0, 0, 0;
             mode << 0, 0, 0;
             break;

@@ -25,6 +25,7 @@
 #define KEYCODE_r       114
 #define KEYCODE_t       116
 #define KEYCODE_l       108
+#define KEYCODE_b       98
 #define KEYCODE_H       72
 #define KEYCODE_R       82
 #define KEYCODE_L       76
@@ -92,7 +93,7 @@ public:
             anafi_autonomy::KeyboardCameraCommand camera_msg;
 
             if(c != 0){
-                ROS_DEBUG_STREAM("key = " << (int)c << endl);
+                ROS_INFO_STREAM("key = " << (int)c << endl);
             }
 
             switch(c){
@@ -102,7 +103,8 @@ public:
                 cout << "Insert \t - arm \n";
                 cout << "t \t - take-off \n";
                 cout << "l \t - land \n";
-                cout << "h \t - hover at position \n";
+
+                cout << "Esc \t - cut motors \n";
                 cout << "UP \t - move forward \n";
                 cout << "DOWN \t - move backward \n";
                 cout << "LEFT \t - move left \n";
@@ -111,6 +113,9 @@ public:
                 cout << "s \t - move down \n";
                 cout << "a \t - yaw clockwise \n";
                 cout << "d \t - yaw counterclockwise \n";
+                cout << "b \t - return to home \n";
+                cout << "SPACE \t - hover \n";
+                cout << "r \t - reset pose \n";
                 break;
 
                 /* UAV commands */
@@ -122,7 +127,7 @@ public:
                 command.data = 2;
                 command_publisher.publish(command);
                 break;
-            case KEYCODE_SPACE: // reset velocities to 0
+            case KEYCODE_SPACE: // hower
                 command.data = 3;
                 command_publisher.publish(command);
                 command_publisher.publish(command);
@@ -138,9 +143,13 @@ public:
                 command_publisher.publish(command);
                 command_publisher.publish(command);
                 break;
-            case KEYCODE_R:
+            case KEYCODE_R: // reset pose
             case KEYCODE_r:
                 command.data = 6;
+                command_publisher.publish(command);
+                break;
+            case KEYCODE_b: // return-to-home
+                command.data = 7;
                 command_publisher.publish(command);
                 break;
             case KEYCODE_F1: // remote control!
