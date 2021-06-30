@@ -93,7 +93,7 @@ public:
             anafi_autonomy::KeyboardCameraCommand camera_msg;
 
             if(c != 0){
-                ROS_INFO_STREAM("key = " << (int)c << endl);
+                ROS_DEBUG_STREAM("key = " << (int)c << endl);
             }
 
             switch(c){
