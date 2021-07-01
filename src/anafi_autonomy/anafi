@@ -406,8 +406,10 @@ class Anafi(threading.Thread):
 		
 	def rtl_callback(self, msg):		
 		rospy.loginfo("Return to Home")
-		assert self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0)).wait().success()
-		assert self.drone(return_to_home).wait().success() # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
+		# assert self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0)).wait().success()
+		# assert self.drone(return_to_home).wait().success() # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
+		self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0))
+		self.drone(return_to_home) # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
 		
 	def offboard_callback(self, msg):
 		if msg.data == False:	

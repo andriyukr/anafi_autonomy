@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+
+<launch>
+	<arg name="robotName" value="anafi"/>
+	<arg name="skycontroller" default="true"/>
+
+	<env name="ROSCONSOLE_FORMAT" value="[${severity}] [${time}] [${node}]: ${message}"/>
+	
+	<param name="/skycontroller" type="boolean" value="$(arg skycontroller)"/>
+	<param name="/safe_anafi/bounds/min_x" type="double" value="-5.0"/>
+	<param name="/safe_anafi/bounds/max_x" type="double" value="5.0"/>
+	<param name="/safe_anafi/bounds/min_y" type="double" value="-5.0"/>
+	<param name="/safe_anafi/bounds/max_y" type="double" value="5.0"/>
+	<param name="/safe_anafi/bounds/min_z" type="double" value="0.0"/>
+	<param name="/safe_anafi/bounds/max_z" type="double" value="2.0"/>
+
+	<remap from="/uav/command" to="/$(arg robotName)/command"/>
+	
+	<node name="set_anafi_log_level" pkg="rosservice" type="rosservice" args="call --wait /anafi/set_logger_level 'rosout' 'info'"/>
+	<node name="set_trajectory_log_level" pkg="rosservice" type="rosservice" args="call --wait /trajectory/set_logger_level 'ros.controllers' 'info'"/>
+	<node name="set_teleop_key_log_level" pkg="rosservice" type="rosservice" args="call --wait /teleop_key/set_logger_level 'ros.controllers' 'info'"/>
+	<node name="set_rviz_log_level" pkg="rosservice" type="rosservice" args="call --wait /rviz/set_logger_level 'ros' 'error'"/>
+		
+	<node name="anafi" pkg="anafi_autonomy" type="anafi" output="screen"/>
+	<node name="safe_anafi" pkg="anafi_autonomy" type="safe_anafi" output="screen" args=""/>
+	<!-- Run in the terminal `xset r rate 10 40` to eliminate the delay after the first press of a key.
+	Later, run in the terminal `xset r rate 240 40` to reset the default delay. -->
+	<!-- <node name="teleop_key" pkg="anafi_autonomy" type="teleop_key" output="screen" args=""/> -->
+	<node name="trajectory" pkg="anafi_autonomy" type="trajectory" output="screen" args=""/>
+
+	<!-- <node name="rviz" pkg="rviz" type="rviz" output="log" args=""/> -->
+	<!-- <node name="rqt_image_view" pkg="rqt_image_view" type="rqt_image_view" args="/$(arg robotName)/image"/> -->
+	<!-- Waits 1s before running dynamic_reconfigure -->
+	<!-- <node name="dynamic_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" output="screen" args="" launch-prefix="bash -c 'sleep 1; $0 $@' "/> -->
+
+    <group ns="anafi_autonomy">
+        <node pkg="anafi_autonomy" type="erl_bridge_main" name="erl_bridge" output="screen">
+            <param name="input_topic" value="/keyboard/command_move" />
+            <!-- <param name="input_topic" value="/anafi/desired_velocity" /> -->
+            <param name="camera_topic" value="/keyboard/command_camera" />
+            <param name="command_topic" value="/keyboard/command_meta" />
+            <param name="feedback_topic" value="/feedback_wrench" />
+
+            <!-- **************************** -->
+            <!-- *** messenger parameters *** -->
+            <!-- **************************** -->
+            <param name="messenger_name" value="drone follower" />
+            <param name="messenger_port" value="13001" />
+
+            <!-- ***************************** -->
+            <!-- *** udp device parameters *** -->
+            <!-- ***************************** -->
+            <param name="is_leader" value="false" />
+            <!-- networking -->
+            <param name="this_port" value="53336" />
+            <param name="remote_id" value="localhost" />
+            <param name="remote_port" value="53335" />
+
+            <!-- loop rate [Hz] -->
+            <param name="rate" value="100" />
+
+            <param name="input_timeout_ms" value="100" />
+        </node>
+        <node pkg="anafi_autonomy" type="rtp_stream" name="rtp_stream" output="screen"></node>
+    </group>
+</launch>
