@@ -13,6 +13,12 @@
 	<param name="/safe_anafi/bounds/max_y" type="double" value="5.0"/>
 	<param name="/safe_anafi/bounds/min_z" type="double" value="0.0"/>
 	<param name="/safe_anafi/bounds/max_z" type="double" value="2.0"/>
+    <param name="/anafi/max_horizontal_speed" type="double" value="4.0"/> <!-- [m/s] -->
+    <param name="/anafi/max_vertical_speed" type="double" value="2.0"/> <!-- [m/s] -->
+    <param name="/anafi/max_yaw_rotation_speed" type="double" value="90"/> <!-- [deg/s] -->
+    <param name="/anafi/max_distance" type="double" value="20"/> <!-- [m] -->
+    <param name="/anafi/max_altitude" type="double" value="4"/> <!-- [m] -->
+    <param name="/anafi/max_gimbal_speed" type="double" value="60"/> <!-- [deg/s] -->
 
 	<remap from="/uav/command" to="/$(arg robotName)/command"/>
 	
