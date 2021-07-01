@@ -73,10 +73,12 @@ void DroneFollower::Receive()
         input_msg.header.stamp.nsec = input_time_nsec_;
 
         if (haptic_input_msg_.wrench.torque.x() > 0)
-            camera_msg.roll = 0.3;
+            // camera_msg.roll = 0.3;
+            camera_msg.zoom = 0.3;
             // camera_msg.angular.x = 0.3;
         else if (haptic_input_msg_.wrench.torque.x() < 0)
-            camera_msg.roll = -0.3;
+            // camera_msg.roll = -0.3;
+            camera_msg.zoom = -0.3;
             // camera_msg.angular.x = -0.3;
         if (haptic_input_msg_.wrench.torque.y() > 0)
             camera_msg.pitch = 0.3;
