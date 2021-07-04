@@ -62,6 +62,7 @@ public:
     json take_off(json args);
     json land(json args);
     json hover_at_position(json args);
+    json return_to_home(json args);
     json start_recording(json args);
     json stop_recording(json args);
     void state_cb(const std_msgs::StringConstPtr& str);
@@ -72,6 +73,7 @@ private:
     std::shared_ptr<RobotP2P::Messenger> messenger_;
     ros::NodeHandle node_handle_;
     std::shared_ptr<DroneFollower> follower_;
+    std::string robot_state_{""};
 
     ros::Publisher command_pub_;
     ros::Publisher landing_pub_;

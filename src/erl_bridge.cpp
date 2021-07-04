@@ -236,6 +236,7 @@ ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
     messenger_->bind_method("take_off", std::bind(&ErlBridge::take_off, this, std::placeholders::_1));
     messenger_->bind_method("land", std::bind(&ErlBridge::land, this, std::placeholders::_1));
     messenger_->bind_method("hover_at_position", std::bind(&ErlBridge::hover_at_position, this, std::placeholders::_1));
+    messenger_->bind_method("return_to_home", std::bind(&ErlBridge::return_to_home, this, std::placeholders::_1));
     messenger_->bind_method("start_recording", std::bind(&ErlBridge::start_recording, this, std::placeholders::_1));
     messenger_->bind_method("stop_recording", std::bind(&ErlBridge::stop_recording, this, std::placeholders::_1));
     messenger_->start_server();
@@ -243,13 +244,18 @@ ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
 
     command_pub_ = n.advertise<std_msgs::Int8>(command_topic_,0);
     landing_pub_ = n.advertise<std_msgs::Int8>(landing_topic_,0);
-    // state_sub_ = n.subscribe("/anafi/state", 1, &ErlBridge::state_cb, this);
+    state_sub_ = n.subscribe("/anafi/state", 1, &ErlBridge::state_cb, this);
 }
 
 void ErlBridge::state_cb(const std_msgs::StringConstPtr& str)
 {
-    json request = {{"state", str->data.c_str()}};
-    messenger_->request("robot_web_tp", "report_state", request, "leader");
+    // std::cout << "state_cb: state = " << robot_state_ << std::endl;
+    if (str->data.c_str() != robot_state_) {
+        robot_state_ = str->data.c_str();
+        std::cout << "state_cb: NEW state = " << robot_state_ << std::endl;
+        json request = {{"state", robot_state_}};
+        messenger_->request("robot_web_tp", "report_state", request, "leader");
+    }
 }
 
 bool ErlBridge::start_bridge()
@@ -285,6 +291,14 @@ json ErlBridge::take_off(json args)
 json ErlBridge::hover_at_position(json args)
 {
     command_.data = 3;
+    command_pub_.publish(command_);
+    json result = {{"success", true}};
+    return result;
+}
+
+json ErlBridge::return_to_home(json args)
+{
+    command_.data = 7;
     command_pub_.publish(command_);
     json result = {{"success", true}};
     return result;
