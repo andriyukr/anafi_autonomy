@@ -29,6 +29,8 @@ public:
     void publish_camera_msg(const anafi_autonomy::KeyboardCameraCommand& camera_msg);
     void start_recording();
     void stop_recording();
+    void arm();
+    void land();
 
 private:
     ros::NodeHandle node_handle_;
@@ -45,6 +47,7 @@ private:
     std::atomic<bool> timed_out_{true}; // if true, sending zero input, if false, sending actual input
     std::atomic<bool> timeout_handled_{false};
     anafi_autonomy::KeyboardCameraCommand camera_zero_msg_;
+    std::atomic<bool> landing_{false};
 };
 
 class ErlBridge {
@@ -71,7 +74,9 @@ private:
     std::shared_ptr<DroneFollower> follower_;
 
     ros::Publisher command_pub_;
+    ros::Publisher landing_pub_;
     std::string command_topic_;
+    std::string landing_topic_;
     std_msgs::Int8 command_;
     ros::Subscriber state_sub_;
 };

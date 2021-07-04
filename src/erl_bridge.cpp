@@ -95,14 +95,10 @@ void DroneFollower::Receive()
         // if ((input_msg.x != input_msg_.x) || (input_msg.y != input_msg_.y) || (input_msg.z != input_msg_.z) || (input_msg.yaw != input_msg_.yaw))
         //     input_pub_.publish(input_msg);
         // if ((input_msg.vx != input_msg_.vx) || (input_msg.vy != input_msg_.vy) || (input_msg.vz != input_msg_.vz) || (input_msg.yaw_rate != input_msg_.yaw_rate))
-        input_pub_.publish(input_msg);
-
-        // if (camera_msg.angular != camera_msg_.angular) {
-        //     std::cout << "      publishing camera message" << std::endl;
-        //     // camera_pub_.publish(camera_zero_msg_);
-        //     camera_pub_.publish(camera_msg);
-        // }
-        camera_pub_.publish(camera_msg);
+        if (! landing_) {
+            input_pub_.publish(input_msg);
+            camera_pub_.publish(camera_msg);
+        }
 
         input_msg_ = input_msg;
         camera_msg_ = camera_msg;
@@ -111,10 +107,14 @@ void DroneFollower::Receive()
         // we didn't receive a new message yet --> honour the timeout
         auto now = std::chrono::high_resolution_clock::now();
         if (now <= last_input_ + input_timeout_ms_) {
-            input_pub_.publish(input_msg_);
+            // input_pub_.publish(input_msg_);
             // if (camera_msg_.angular.x != 0 || camera_msg_.angular.y != 0)
             // camera_pub_.publish(camera_zero_msg_);
-            camera_pub_.publish(camera_msg_);
+            // camera_pub_.publish(camera_msg_);
+            if (! landing_) {
+                input_pub_.publish(input_msg_);
+                camera_pub_.publish(camera_msg_);
+            }
 
         } else {
             // timed_out_ = true;
@@ -159,8 +159,12 @@ void DroneFollower::Receive()
                 // camera_pub_.publish(camera_msg_);
                 // timeout_handled_ = true;
             // }
-            input_pub_.publish(input_msg_);
-            camera_pub_.publish(camera_msg_);
+            // input_pub_.publish(input_msg_);
+            // camera_pub_.publish(camera_msg_);
+            if (! landing_) {
+                input_pub_.publish(input_msg_);
+                camera_pub_.publish(camera_msg_);
+            }
         }
     }
 }
@@ -197,6 +201,16 @@ void DroneFollower::publish_camera_msg(const anafi_autonomy::KeyboardCameraComma
     camera_pub_.publish(camera_msg);
 }
 
+void DroneFollower::land()
+{
+    landing_ = true;
+}
+
+void DroneFollower::arm()
+{
+    landing_ = false;
+}
+
 ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
 {
     node_handle_ = n;
@@ -212,6 +226,8 @@ ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
     messenger_port_ = value;
     n.getParam(n_namespace+"/command_topic", str);
     command_topic_ = str;
+    n.getParam(n_namespace+"/command_land_topic", str);
+    landing_topic_ = str;
 
     messenger_ = std::make_shared<RobotP2P::Messenger>(messenger_name_, messenger_port_);
     messenger_->set_spdlog_level(0);
@@ -226,6 +242,7 @@ ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
     // messenger_->set_spdlog_level(0);
 
     command_pub_ = n.advertise<std_msgs::Int8>(command_topic_,0);
+    landing_pub_ = n.advertise<std_msgs::Int8>(landing_topic_,0);
     // state_sub_ = n.subscribe("/anafi/state", 1, &ErlBridge::state_cb, this);
 }
 
@@ -247,6 +264,7 @@ bool ErlBridge::stop_bridge()
 
 json ErlBridge::arm(json args)
 {
+    follower_->arm();
     command_.data = 1;
     command_pub_.publish(command_);
     json result = {{"success", true}};
@@ -274,8 +292,10 @@ json ErlBridge::hover_at_position(json args)
 
 json ErlBridge::land(json args)
 {
+    follower_->land();
     command_.data = 4;
-    command_pub_.publish(command_);
+    // command_pub_.publish(command_);
+    landing_pub_.publish(command_);
     json result = {{"success", true}};
     return result;
 }
