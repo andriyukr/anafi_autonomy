@@ -81,7 +81,7 @@ class Anafi(threading.Thread):
 		rospy.Subscriber("/anafi/takeoff", Empty, self.takeoff_callback)
 		rospy.Subscriber("/anafi/land", Empty, self.land_callback)
 		rospy.Subscriber("/anafi/emergency", Empty, self.emergency_callback)
-		rospy.Subscriber("/anafi/rtl", Empty, self.rtl_callback)
+		rospy.Subscriber("/anafi/rth", Empty, self.rth_callback)
 		rospy.Subscriber("/anafi/offboard", Bool, self.offboard_callback)
 		rospy.Subscriber("/anafi/cmd_rpyt", PilotingCommand, self.rpyt_callback)
 		rospy.Subscriber("/anafi/cmd_moveto", MoveToCommand, self.moveTo_callback)
@@ -402,7 +402,7 @@ class Anafi(threading.Thread):
 		rospy.logfatal("Emergency!!!")
 		assert self.drone(Emergency()).wait().success() # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.Piloting.Emergency
 		
-	def rtl_callback(self, msg):		
+	def rth_callback(self, msg):		
 		rospy.loginfo("Return to Home")
 		assert self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0)).wait().success()
 		self.drone(return_to_home) # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
@@ -503,13 +503,13 @@ class Anafi(threading.Thread):
 		self.msg_skycontroller.header.stamp = rospy.Time.now()
 		self.pub_skycontroller.publish(self.msg_skycontroller)
 		
-		# button: 	0 = RTL, 1 = takeoff/land, 2 = back left, 3 = back right
+		# button: 	0 = RTH, 1 = takeoff/land, 2 = back left, 3 = back right
 		self.drone(mapper.grab(buttons=(0<<0|0<<1|0<<2|1<<3), axes=0)).wait() # bitfields
 		self.drone(setPilotingSource(source="SkyController")).wait()
 		rospy.loginfo("Control: Manual")
 			
 	def switch_offboard(self):
-		# button: 	0 = RTL, 1 = takeoff/land, 2 = back left, 3 = back right
+		# button: 	0 = RTH, 1 = takeoff/land, 2 = back left, 3 = back right
 		# axis: 	0 = yaw, 1 = trottle, 2 = roll, 3 = pithch, 4 = camera, 5 = zoom
 		self.drone(mapper.grab(buttons=(1<<0|0<<1|1<<2|1<<3), axes=(1<<0|1<<1|1<<2|1<<3|1<<4|1<<5))) # bitfields
 		self.drone(setPilotingSource(source="Controller")).wait()
