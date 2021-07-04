@@ -36,7 +36,7 @@ from olympe.messages.ardrone3.SpeedSettings import MaxVerticalSpeed, MaxRotation
 from olympe.messages.ardrone3.SpeedSettingsState import MaxVerticalSpeedChanged, MaxRotationSpeedChanged, MaxPitchRollRotationSpeedChanged
 from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged
 from olympe.messages.ardrone3.GPSState import NumberOfSatelliteChanged
-from olympe.messages.rth import return_to_home, set_ending_behavior, set_ending_hovering_altitude, set_min_altitude
+from olympe.messages.rth import return_to_home, abort, set_ending_behavior, set_ending_hovering_altitude, set_min_altitude
 from olympe.messages.skyctrl.CoPiloting import setPilotingSource
 from olympe.messages.skyctrl.CoPilotingState import pilotingSource
 from olympe.messages.skyctrl.Common import AllStates
@@ -137,9 +137,7 @@ class Anafi(threading.Thread):
 		#print("animation.availability: " + str(self.drone.get_state(olympe.messages.animation.availability)))
 		#print("leds.capabilities: " + str(self.drone.get_state(olympe.messages.leds.capabilities)))
 		#print("camera.camera_capabilities: " + str(self.drone.get_state(olympe.messages.camera.camera_capabilities)))
-		
-		
-		
+			
 	def connect(self):
 		self.event_listener.subscribe()
 		self.msg_skycontroller = SkyControllerCommand()
@@ -407,7 +405,7 @@ class Anafi(threading.Thread):
 	def rtl_callback(self, msg):		
 		rospy.loginfo("Return to Home")
 		assert self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0)).wait().success()
-		assert self.drone(return_to_home).wait().success() # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
+		self.drone(return_to_home) # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
 		
 	def offboard_callback(self, msg):
 		if msg.data == False:	
@@ -499,6 +497,8 @@ class Anafi(threading.Thread):
 		return []
 
 	def switch_manual(self):
+		self.drone(abort) # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.abort
+	
 		self.msg_skycontroller = SkyControllerCommand()
 		self.msg_skycontroller.header.stamp = rospy.Time.now()
 		self.pub_skycontroller.publish(self.msg_skycontroller)
