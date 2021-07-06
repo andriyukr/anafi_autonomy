@@ -239,12 +239,14 @@ ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
     messenger_->bind_method("return_to_home", std::bind(&ErlBridge::return_to_home, this, std::placeholders::_1));
     messenger_->bind_method("start_recording", std::bind(&ErlBridge::start_recording, this, std::placeholders::_1));
     messenger_->bind_method("stop_recording", std::bind(&ErlBridge::stop_recording, this, std::placeholders::_1));
+    messenger_->bind_method("get_home_position", std::bind(&ErlBridge::get_home_position, this, std::placeholders::_1));
     messenger_->start_server();
     // messenger_->set_spdlog_level(0);
 
     command_pub_ = n.advertise<std_msgs::Int8>(command_topic_,0);
     landing_pub_ = n.advertise<std_msgs::Int8>(landing_topic_,0);
     state_sub_ = n.subscribe("/anafi/state", 1, &ErlBridge::state_cb, this);
+    position_sub_ = n.subscribe("/anafi/location", 1, &ErlBridge::position_cb, this);
 }
 
 void ErlBridge::state_cb(const std_msgs::StringConstPtr& str)
@@ -258,6 +260,17 @@ void ErlBridge::state_cb(const std_msgs::StringConstPtr& str)
     }
 }
 
+void ErlBridge::position_cb(const geometry_msgs::PointStamped& position)
+{
+    if (! home_set_) {
+        if ((position.point.x != 0) && (position.point.y != 0) && (position.point.z !=0)) {
+            std::cout << "ErlBridge: home set!" << std::endl;
+            home_position_ = {{"x", position.point.x}, {"y", position.point.y}, {"z", position.point.z}};
+            home_set_ = true;
+        }
+    }
+}
+
 bool ErlBridge::start_bridge()
 {
 
@@ -266,6 +279,15 @@ bool ErlBridge::start_bridge()
 bool ErlBridge::stop_bridge()
 {
 
+}
+
+json ErlBridge::get_home_position(json args)
+{
+    if (home_set_) {
+        return {{"result", true}, {"home", home_position_}};
+    } else {
+        return {{"result", false}};
+    }
 }
 
 json ErlBridge::arm(json args)
@@ -298,6 +320,7 @@ json ErlBridge::hover_at_position(json args)
 
 json ErlBridge::return_to_home(json args)
 {
+    std::cout << "ErlBridge: return to home" << std::endl;
     command_.data = 7;
     command_pub_.publish(command_);
     json result = {{"success", true}};

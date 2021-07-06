@@ -5,6 +5,7 @@
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <geometry_msgs/PointStamped.h>
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 
@@ -65,7 +66,9 @@ public:
     json return_to_home(json args);
     json start_recording(json args);
     json stop_recording(json args);
+    json get_home_position(json args);
     void state_cb(const std_msgs::StringConstPtr& str);
+    void position_cb(const geometry_msgs::PointStamped& position);
 
 private:
     std::string messenger_name_;
@@ -74,6 +77,9 @@ private:
     ros::NodeHandle node_handle_;
     std::shared_ptr<DroneFollower> follower_;
     std::string robot_state_{""};
+    std::atomic<bool> home_set_{false};
+    ros::Subscriber position_sub_;
+    json home_position_;
 
     ros::Publisher command_pub_;
     ros::Publisher landing_pub_;
