@@ -20,6 +20,10 @@
     <param name="/anafi/max_altitude" type="double" value="30"/> <!-- [m] -->
     <param name="/anafi/max_gimbal_speed" type="double" value="60"/> <!-- [deg/s] -->
 
+    <!-- Return To Home -->
+    <param name="/anafi/hovering_altitude" type="double" value="20"/> <!-- [m] -->
+    <param name="/anafi/min_altitude" type="double" value="30"/> <!-- [m] -->
+
     <remap from="/uav/command" to="/$(arg robotName)/command"/>
 
     <node name="set_anafi_log_level" pkg="rosservice" type="rosservice" args="call --wait /anafi/set_logger_level 'rosout' 'info'"/>
