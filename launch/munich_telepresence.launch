@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+
+<launch>
+    <arg name="robotName" value="anafi"/>
+    <arg name="skycontroller" default="true"/>
+
+    <env name="ROSCONSOLE_FORMAT" value="[${severity}] [${time}] [${node}]: ${message}"/>
+
+    <param name="/skycontroller" type="boolean" value="$(arg skycontroller)"/>
+    <param name="/safe_anafi/bounds/min_x" type="double" value="-5.0"/>
+    <param name="/safe_anafi/bounds/max_x" type="double" value="5.0"/>
+    <param name="/safe_anafi/bounds/min_y" type="double" value="-5.0"/>
+    <param name="/safe_anafi/bounds/max_y" type="double" value="5.0"/>
+    <param name="/safe_anafi/bounds/min_z" type="double" value="0.0"/>
+    <param name="/safe_anafi/bounds/max_z" type="double" value="2.0"/>
+    <param name="/anafi/max_horizontal_speed" type="double" value="2.0"/> <!-- [m/s] -->
+    <param name="/anafi/max_vertical_speed" type="double" value="1.0"/> <!-- [m/s] -->
+    <param name="/anafi/max_yaw_rotation_speed" type="double" value="75"/> <!-- [deg/s] -->
+    <param name="/anafi/max_distance" type="double" value="20"/> <!-- [m] -->
+    <param name="/anafi/max_altitude" type="double" value="4"/> <!-- [m] -->
+    <param name="/anafi/max_gimbal_speed" type="double" value="60"/> <!-- [deg/s] -->
+
+    <!-- Return To Home -->
+    <param name="/anafi/hovering_altitude" type="double" value="3"/> <!-- [m] -->
+    <param name="/anafi/min_altitude" type="double" value="5"/> <!-- [m] -->
+
+    <remap from="/uav/command" to="/$(arg robotName)/command"/>
+
+    <node name="set_anafi_log_level" pkg="rosservice" type="rosservice" args="call --wait /anafi/set_logger_level 'rosout' 'info'"/>
+    <node name="set_trajectory_log_level" pkg="rosservice" type="rosservice" args="call --wait /trajectory/set_logger_level 'ros.controllers' 'info'"/>
+    <node name="set_teleop_key_log_level" pkg="rosservice" type="rosservice" args="call --wait /teleop_key/set_logger_level 'ros.controllers' 'info'"/>
+    <node name="set_rviz_log_level" pkg="rosservice" type="rosservice" args="call --wait /rviz/set_logger_level 'ros' 'error'"/>
+
+    <node name="anafi" pkg="anafi_autonomy" type="anafi" output="screen"/>
+    <node name="safe_anafi" pkg="anafi_autonomy" type="safe_anafi" output="screen" args=""/>
+    <!-- Run in the terminal `xset r rate 10 40` to eliminate the delay after the first press of a key.
+    Later, run in the terminal `xset r rate 240 40` to reset the default delay. -->
+    <node name="trajectory" pkg="anafi_autonomy" type="trajectory" output="screen" args=""/>
+
+    <group ns="anafi_autonomy">
+        <node pkg="anafi_autonomy" type="erl_bridge_main" name="erl_bridge" output="screen">
+            <param name="input_topic" value="/keyboard/command_move" />
+            <param name="camera_topic" value="/keyboard/command_camera" />
+            <param name="command_topic" value="/keyboard/command_meta" />
+            <param name="command_land_topic" value="/command_land" />
+            <param name="feedback_topic" value="/feedback_wrench" />
+
+            <!-- **************************** -->
+            <!-- *** messenger parameters *** -->
+            <!-- **************************** -->
+            <param name="messenger_name" value="drone follower" />
+            <param name="messenger_port" value="13001" />
+
+            <!-- ***************************** -->
+            <!-- *** udp device parameters *** -->
+            <!-- ***************************** -->
+            <param name="is_leader" value="false" />
+            <!-- networking -->
+            <param name="this_port" value="53336" />
+            <param name="remote_id" value="localhost" />
+            <param name="remote_port" value="53335" />
+
+            <!-- loop rate [Hz] -->
+            <param name="rate" value="100" />
+
+            <param name="input_timeout_ms" value="100" />
+        </node>
+        <node pkg="anafi_autonomy" type="rtp_stream" name="rtp_stream" output="screen"></node>
+    </group>
+
+    <node name="set_aruco_log_level" pkg="rosservice" type="rosservice" args="call --wait /aruco/set_logger_level 'ros.tf2_ros' 'error'" />
+    <node name="set_aruco_landing_log_level" pkg="rosservice" type="rosservice" args="call --wait /aruco_landing/set_logger_level 'ros.controllers' 'debug'"/>
+    <arg name="markerId" default="698"/>
+    <arg name="markerSize" default="0.397"/>    <!-- in m -->
+    <arg name="marker_frame" default="aruco_marker_frame"/>
+    <arg name="ref_frame" default=""/>  <!-- leave empty and the pose will be published wrt param parent_name -->
+    <param name="/safe_anafi/k_p_position" type="double" value="1.0"/> <!-- [-] -->
+    <param name="/safe_anafi/k_i_position" type="double" value="1.0"/> <!-- [-] -->
+    <param name="/safe_anafi/k_d_position" type="double" value="0.5"/> <!-- [-] -->
+    <param name="/safe_anafi/k_p_yaw" type="double" value="40"/> <!-- [-] -->
+
+    <node name="aruco" pkg="aruco_ros" type="single">
+        <remap from="/camera_info" to="/anafi/camera_info"/>
+        <remap from="/image" to="/anafi/image"/>
+        <param name="image_is_rectified" value="True"/>
+        <param name="marker_size" value="$(arg markerSize)"/>
+        <param name="marker_id" value="$(arg markerId)"/>
+        <param name="reference_frame" value="$(arg ref_frame)"/>   <!-- frame in which the marker pose will be refered -->
+        <param name="camera_frame" value="camera_frame"/>
+        <param name="marker_frame" value="marker_frame"/>
+    </node>
+    <node name="aruco_landing" pkg="anafi_extras" type="aruco_landing" output="screen" args="">
+    </node>
+</launch>
