@@ -58,6 +58,7 @@ void dynamicReconfigureCallback(anafi_autonomy::setSafeAnafiConfig &config, uint
 		world_frame = config.world_frame;
 		if(!world_frame)
 			initial_yaw = yaw;
+        min_altitude = config.min_altitude;
     }
 	if(level == -1 || level == 2){
 		k_p_position = config.k_p_position;
@@ -395,7 +396,11 @@ void SafeAnafi::run(){
 			ros::param::get("/anafi/max_horizontal_speed", max_horizontal_speed);
 			command_move(0) = BOUND(command_move(0), max_horizontal_speed);
 			command_move(1) = BOUND(command_move(1), max_horizontal_speed);
-            
+            if (position.z() < min_altitude) {
+                // std::cout << "below min_altitude: " << position.z() << std::endl;
+                if (command_move(2) < 0)
+                    command_move(2) = 0;
+            }
 			if(fixed_frame)
 				command_move << cos(yaw)*command_move(0) + sin(yaw)*command_move(1), -sin(yaw)*command_move(0) + cos(yaw)*command_move(1),
 					command_move(2), command_move(3); // rotate command from world frame to body frame

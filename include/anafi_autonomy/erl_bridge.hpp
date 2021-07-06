@@ -8,6 +8,9 @@
 #include <geometry_msgs/PointStamped.h>
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
+#include <dynamic_reconfigure/DoubleParameter.h>
+#include <dynamic_reconfigure/Reconfigure.h>
+#include <dynamic_reconfigure/Config.h>
 
 #include <anafi_autonomy/KeyboardMoveCommand.h>
 // #include <anafi_autonomy/VelocityCommand.h>
@@ -67,6 +70,7 @@ public:
     json start_recording(json args);
     json stop_recording(json args);
     json get_home_position(json args);
+    json set_altitude_limits(json args);
     void state_cb(const std_msgs::StringConstPtr& str);
     void position_cb(const geometry_msgs::PointStamped& position);
 
@@ -80,6 +84,8 @@ private:
     std::atomic<bool> home_set_{false};
     ros::Subscriber position_sub_;
     json home_position_;
+    double max_altitude_;
+    double min_altitude_;
 
     ros::Publisher command_pub_;
     ros::Publisher landing_pub_;

@@ -210,6 +210,7 @@ class Anafi(threading.Thread):
 			self.drone(MaxPitchRollRotationSpeed(config['max_pitch_roll_rotation_speed'])) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.SpeedSettings.MaxPitchRollRotationSpeed
 			self.drone(MaxDistance(config['max_distance'])) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.PilotingSettings.MaxDistance
 			self.drone(MaxAltitude(config['max_altitude'])) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.PilotingSettings.MaxAltitude
+			# self.drone(MinAltitude(config['min_altitude'])) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.PilotingSettings.MinAltitude --> doesn't work for multicopters, only fixed wings
 			self.drone(NoFlyOverMaxDistance(1)) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.PilotingSettings.NoFlyOverMaxDistance
 			self.drone(BankedTurn(int(config['banked_turn']))) # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.PilotingSettings.BankedTurn
 			self.max_tilt = config['max_tilt']
@@ -224,7 +225,7 @@ class Anafi(threading.Thread):
 				altitude=config['hovering_altitude'] # AGL altitude (m)
 				))
 			self.drone(set_min_altitude( # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.set_min_altitude
-				altitude=config['min_altitude'] # ATO altitude (m)
+				altitude=config['rth_min_altitude'] # ATO altitude (m)
 				))
 		if level == -1 or level == 3: # camera related
 			self.gimbal_frame = 'absolute' if config['gimbal_absolute'] else 'relative'

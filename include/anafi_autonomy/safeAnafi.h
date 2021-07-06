@@ -113,6 +113,9 @@ Vector3d orientation = Vector3d::Zero();
 double yaw = 0;
 double initial_yaw = 0;
 
+// Altitude
+double min_altitude = 0.5;
+
 // Velocity
 Vector3d velocity_error = Vector3d::Zero();
 Vector3d velocity_error_i = Vector3d::Zero();

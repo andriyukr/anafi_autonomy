@@ -228,6 +228,14 @@ ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
     command_topic_ = str;
     n.getParam(n_namespace+"/command_land_topic", str);
     landing_topic_ = str;
+    n.getParam(n_namespace+"/safe_max_altitude",value);
+    double safe_max_altitude = value;
+    n.getParam(n_namespace+"/safe_min_altitude",value);
+    double safe_min_altitude = value;
+    n.getParam("/safe_anafi/min_altitude",value);
+    min_altitude_ = value;
+    n.getParam("/anafi/max_altitude",value);
+    max_altitude_ = value;
 
     messenger_ = std::make_shared<RobotP2P::Messenger>(messenger_name_, messenger_port_);
     messenger_->set_spdlog_level(0);
@@ -240,6 +248,7 @@ ErlBridge::ErlBridge(ros::NodeHandle n, std::shared_ptr<DroneFollower> follower)
     messenger_->bind_method("start_recording", std::bind(&ErlBridge::start_recording, this, std::placeholders::_1));
     messenger_->bind_method("stop_recording", std::bind(&ErlBridge::stop_recording, this, std::placeholders::_1));
     messenger_->bind_method("get_home_position", std::bind(&ErlBridge::get_home_position, this, std::placeholders::_1));
+    messenger_->bind_method("set_altitude_limits", {{"max_altitude", safe_max_altitude}, {"min_altitude", safe_min_altitude}}, std::bind(&ErlBridge::set_altitude_limits, this, std::placeholders::_1));
     messenger_->start_server();
     // messenger_->set_spdlog_level(0);
 
@@ -341,6 +350,55 @@ json ErlBridge::stop_motors(json args)
 {
     command_.data = 5;
     command_pub_.publish(command_);
+    json result = {{"success", true}};
+    return result;
+}
+
+json ErlBridge::set_altitude_limits(json args)
+{
+    std::cout << "set_altitude_limits: " << args << std::endl;
+    dynamic_reconfigure::ReconfigureRequest srv_req;
+    dynamic_reconfigure::ReconfigureResponse srv_resp;
+    dynamic_reconfigure::DoubleParameter double_param;
+
+    if (args["active"]) {
+        {
+            dynamic_reconfigure::Config conf;
+            double_param.name = "max_altitude";
+            double_param.value = args["max_altitude"];
+            conf.doubles.push_back(double_param);
+            srv_req.config = conf;
+            ros::service::call("/anafi/set_parameters", srv_req, srv_resp);
+        }
+        {
+            dynamic_reconfigure::Config conf;
+            double_param.name = "min_altitude";
+            double_param.value = args["min_altitude"];
+            std::cout << "setitng min_altitude to: " << args["min_altitude"] << std::endl;
+            conf.doubles.push_back(double_param);
+            srv_req.config = conf;
+            ros::service::call("/safe_anafi/set_parameters", srv_req, srv_resp);
+        }
+    } else {
+        {
+            dynamic_reconfigure::Config conf;
+            double_param.name = "max_altitude";
+            double_param.value = max_altitude_;
+            conf.doubles.push_back(double_param);
+            srv_req.config = conf;
+            ros::service::call("/anafi/set_parameters", srv_req, srv_resp);
+        }
+        {
+            dynamic_reconfigure::Config conf;
+            double_param.name = "min_altitude";
+            double_param.value = min_altitude_;
+            std::cout << "setitng min_altitude to: " << min_altitude_ << std::endl;
+            conf.doubles.push_back(double_param);
+            srv_req.config = conf;
+            ros::service::call("/safe_anafi/set_parameters", srv_req, srv_resp);
+        }
+    }
+
     json result = {{"success", true}};
     return result;
 }
