@@ -18,11 +18,12 @@
     <param name="/anafi/max_yaw_rotation_speed" type="double" value="75"/> <!-- [deg/s] -->
     <param name="/anafi/max_distance" type="double" value="400"/> <!-- [m] -->
     <param name="/anafi/max_altitude" type="double" value="30"/> <!-- [m] -->
+    <param name="/safe_anafi/min_altitude" type="double" value="0.5"/> <!-- [m] -->
     <param name="/anafi/max_gimbal_speed" type="double" value="60"/> <!-- [deg/s] -->
 
     <!-- Return To Home -->
     <param name="/anafi/hovering_altitude" type="double" value="20"/> <!-- [m] -->
-    <param name="/anafi/min_altitude" type="double" value="30"/> <!-- [m] -->
+    <param name="/anafi/rth_min_altitude" type="double" value="30"/> <!-- [m] -->
 
     <remap from="/uav/command" to="/$(arg robotName)/command"/>
 
@@ -44,6 +45,9 @@
             <param name="command_topic" value="/keyboard/command_meta" />
             <param name="command_land_topic" value="/command_land" />
             <param name="feedback_topic" value="/feedback_wrench" />
+
+            <param name="safe_min_altitude" value="20" />
+            <param name="safe_max_altitude" value="30" />
 
             <!-- **************************** -->
             <!-- *** messenger parameters *** -->
