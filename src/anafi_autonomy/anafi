@@ -404,8 +404,10 @@ class Anafi(threading.Thread):
 		
 	def rth_callback(self, msg):		
 		rospy.loginfo("Return to Home")
-		assert self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0)).wait().success()
-		self.drone(return_to_home()) # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
+		self.rtl = True
+		assert self.drone(PCMD(flag=1, roll=0, pitch=0, yaw=0, gaz=0, timestampAndSeqNum=0)).wait().success()		
+		assert self.drone(return_to_home()).wait().success() # https://developer.parrot.com/docs/olympe/arsdkng_rth.html#olympe.messages.rth.return_to_home
+		self.rtl = False
 		
 	def offboard_callback(self, msg):
 		if msg.data == False:	
@@ -414,13 +416,14 @@ class Anafi(threading.Thread):
 			self.switch_offboard()
 						
 	def rpyt_callback(self, msg):
-		self.drone(PCMD( # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.Piloting.PCMD
-			flag=1,
-			roll=int(self.bound_percentage(msg.roll/self.max_tilt*100)), # roll [-100, 100] (% of max tilt)
-			pitch=int(self.bound_percentage(msg.pitch/self.max_tilt*100)), # pitch [-100, 100] (% of max tilt)
-			yaw=int(self.bound_percentage(-msg.yaw/self.max_rotation_speed*100)), # yaw rate [-100, 100] (% of max yaw rate)
-			gaz=int(self.bound_percentage(msg.gaz/self.max_vertical_speed*100)), # vertical speed [-100, 100] (% of max vertical speed)
-			timestampAndSeqNum=0)) # for debug only
+		if not self.rtl:
+			self.drone(PCMD( # https://developer.parrot.com/docs/olympe/arsdkng_ardrone3_piloting.html#olympe.messages.ardrone3.Piloting.PCMD
+				flag=1,
+				roll=int(self.bound_percentage(msg.roll/self.max_tilt*100)), # roll [-100, 100] (% of max tilt)
+				pitch=int(self.bound_percentage(msg.pitch/self.max_tilt*100)), # pitch [-100, 100] (% of max tilt)
+				yaw=int(self.bound_percentage(-msg.yaw/self.max_rotation_speed*100)), # yaw rate [-100, 100] (% of max yaw rate)
+				gaz=int(self.bound_percentage(msg.gaz/self.max_vertical_speed*100)), # vertical speed [-100, 100] (% of max vertical speed)
+				timestampAndSeqNum=0)) # for debug only
 
 	# TODO: NOT USED YET	
 	def moveBy_callback(self, msg):		
@@ -581,6 +584,9 @@ class Anafi(threading.Thread):
 			self.msg_skycontroller.takeoff_land = False
 			self.msg_skycontroller.reset_camera = False
 			self.msg_skycontroller.reset_zoom = False
+			
+			# rospy.loginfo_throttle(1, "rth.home_type_capabilities: " + str(self.drone.get_state(olympe.messages.rth.home_type_capabilities)))
+			rospy.loginfo_throttle(1, "rth.state: " + str(self.drone.get_state(olympe.messages.rth.state)))
 								
 			rate.sleep()
 
