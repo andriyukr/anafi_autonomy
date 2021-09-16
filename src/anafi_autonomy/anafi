@@ -132,7 +132,7 @@ class Anafi(threading.Thread):
 		self.msg_camera_info.P = camera_info["projection_matrix"]["data"]
 		self.msg_camera_info.distortion_model = camera_info["distortion_model"]
 		
-		self.drone(camera.set_zoom_velocity_quality_degradation(cam_id=0, allow=0)) # https://developer.parrot.com/docs/olympe/arsdkng_camera.html#olympe.messages.camera.set_zoom_velocity_quality_degradation
+		self.drone(camera.set_zoom_velocity_quality_degradation(cam_id=0, allow=1)) # https://developer.parrot.com/docs/olympe/arsdkng_camera.html#olympe.messages.camera.set_zoom_velocity_quality_degradation
 		
 		#print("animation.availability: " + str(self.drone.get_state(olympe.messages.animation.availability)))
 		#print("leds.capabilities: " + str(self.drone.get_state(olympe.messages.leds.capabilities)))
