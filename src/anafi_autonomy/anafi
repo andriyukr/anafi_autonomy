@@ -95,6 +95,8 @@ class Anafi(threading.Thread):
 		rospy.Service('reset_zoom', EmptyServise, self.reset_zoom)
 		rospy.Service('reset_gimbal', EmptyServise, self.reset_gimbal)
 		
+		self.rtl = False
+		
 		# Connect to the SkyController	
 		if rospy.get_param("/skycontroller"):
 			rospy.loginfo("Connecting through SkyController");
@@ -586,7 +588,7 @@ class Anafi(threading.Thread):
 			self.msg_skycontroller.reset_zoom = False
 			
 			# rospy.loginfo_throttle(1, "rth.home_type_capabilities: " + str(self.drone.get_state(olympe.messages.rth.home_type_capabilities)))
-			rospy.loginfo_throttle(1, "rth.state: " + str(self.drone.get_state(olympe.messages.rth.state)))
+			# rospy.loginfo_throttle(1, "rth.state: " + str(self.drone.get_state(olympe.messages.rth.state)))
 								
 			rate.sleep()
 

@@ -150,7 +150,7 @@ void commandMetaCallback(const std_msgs::Int8& command_msg){
             Duration(1).sleep();
             land = false;
         }else
-            ROS_WARN("Arm the drone before taking-off.");
+            ROS_WARN("Arm the drone with 'Insert' before taking-off.");
         arm = false;
         break;
     case 3: // hower
