@@ -48,26 +48,30 @@ Vector3d filter_polinomial_acceleration(Eigen::Ref<Eigen::VectorXd> a){
 }
 
 // ********************** Callbacks **********************
-
-/* Dynamic reconfigure callback function (from GUI)
- * Subscribes to the values set by user for controller type from the graphical interface
- */
 void dynamicReconfigureCallback(anafi_autonomy::setSafeAnafiConfig &config, uint32_t level){
     if(level == -1 || level == 1){
-    	fixed_frame = config.fixed_frame;
-		world_frame = config.world_frame;
-		if(!world_frame)
-			initial_yaw = yaw;
+        hand_launch = config.hand_launch;
+        takingoff_control = config.takingoff_control;
+        landing_control = config.landing_control;
+        fixed_frame = config.fixed_frame;
+        world_frame = config.world_frame;
+        if(!world_frame)
+            initial_yaw = yaw;
     }
-	if(level == -1 || level == 2){
-		k_p_position = config.k_p_position;
-		k_i_position = config.k_i_position;
-		k_d_position = config.k_d_position;
-		max_i_position = config.max_i_position;
-		k_p_velocity = config.k_p_velocity;
-		k_d_velocity = config.k_d_velocity;
-		k_p_yaw = config.k_p_yaw;
-	}
+    if(level == -1 || level == 2){ // mission
+        mission_type = config.mission_type;
+        flightplan_file = config.flightplan_file;
+        followme_mode = config.followme_mode;
+    }
+    if(level == -1 || level == 3){ // gains
+        k_p_position = config.k_p_position;
+        k_i_position = config.k_i_position;
+        k_d_position = config.k_d_position;
+        max_i_position = config.max_i_position;
+        k_p_velocity = config.k_p_velocity;
+        k_d_velocity = config.k_d_velocity;
+        k_p_yaw = config.k_p_yaw;
+    }
 }
 
 void odometryCallback(const nav_msgs::Odometry& odometry_msg){
@@ -80,14 +84,8 @@ void odometryCallback(const nav_msgs::Odometry& odometry_msg){
     double roll, pitch;
     m.getRPY(roll, pitch, yaw);
 
-	if(!world_frame)
-    	yaw = yaw - initial_yaw;
-
-    geometry_msgs::Vector3 euler_msg;
-    euler_msg.x = roll/M_PI*180;
-    euler_msg.y = pitch/M_PI*180;
-    euler_msg.z = yaw/M_PI*180;
-    euler_publisher.publish(euler_msg);
+    if(!world_frame)
+        yaw = yaw - initial_yaw;
 
     velocity << odometry_msg.twist.twist.linear.x, odometry_msg.twist.twist.linear.y, odometry_msg.twist.twist.linear.z;
 
@@ -134,95 +132,39 @@ void optitrackCallback(const geometry_msgs::PoseStamped& optitrack_msg){
     time_old = odometry_msg.header.stamp;
 }
 
-void commandMetaCallback(const std_msgs::Int8& command_msg){
-    std_msgs::Empty empty_msg;
-    anafi_autonomy::PilotingCommand rpyg_msg;
-    std_msgs::Bool offboard_msg;
-    switch(command_msg.data){
-    case 1: // arm
-        arm = true;
-        break;
-    case 2: // take-off
-        if(arm){
-            offboard_msg.data = false;
-            offboard_publisher.publish(offboard_msg);
-            takeoff_publisher.publish(empty_msg);
-            Duration(1).sleep();
-            land = false;
-        }else
-            ROS_WARN("Arm the drone with 'Insert' before taking-off.");
-        arm = false;
-        break;
-    case 3: // hower
-        rpyg_publisher.publish(rpyg_msg);
-        rpyg_publisher.publish(rpyg_msg);
-        ros::param::set("/trajectory/trajectory", 1);
-        break;
-    case 4: // land
-        rpyg_publisher.publish(rpyg_msg);
-        rpyg_publisher.publish(rpyg_msg);
-        land_publisher.publish(empty_msg);
-        land_publisher.publish(empty_msg);
-        land = true;
-        break;
-    case 5: // disarm!
-        emergency_publisher.publish(empty_msg);
-        emergency_publisher.publish(empty_msg);
-        land = true;
-        break;
-    case 6: // reset pose
-        ROS_INFO("Reseting position and heading");
-        position << 0, 0, 0;
-        initial_yaw = yaw;
-        break;
-    case 7: // return-to-home
-        rth_publisher.publish(empty_msg);
-        break;
-    case 101: // remote control!
-        offboard_msg.data = false;
-        offboard_publisher.publish(offboard_msg);
-        break;
-    case 102: // offboard control!
-        offboard_msg.data = true;
-        offboard_publisher.publish(offboard_msg);
-        break;
-    }
+void actionCallback(const std_msgs::Int8& action_msg){
+    action = static_cast<Actions>(action_msg.data);
 }
 
-void commandKeyboardCallback(const anafi_autonomy::KeyboardMoveCommand& command_msg){
-    ros::param::get("/anafi/max_vertical_speed", max_vertical_speed);
-    ros::param::get("/anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
-    ros::param::get("/anafi/max_horizontal_speed", max_horizontal_speed);
+void keyboardDroneCallback(const anafi_autonomy::KeyboardDroneCommand& command_msg){
+    ros::param::get("anafi/max_vertical_speed", max_vertical_speed);
+    ros::param::get("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
+    ros::param::get("anafi/max_horizontal_speed", max_horizontal_speed);
     command_keyboard << max_horizontal_speed*command_msg.x, max_horizontal_speed*command_msg.y, max_vertical_speed*command_msg.z, max_yaw_rotation_speed*command_msg.yaw;
     mode_keyboard << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE),
-    	(command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
+            (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
 }
 
 void commandSkycontrollerCallback(const anafi_autonomy::SkyControllerCommand& command_msg){
-	// Drone commands
-    ros::param::get("/anafi/max_vertical_speed", max_vertical_speed);
-    ros::param::get("/anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
-    ros::param::get("/anafi/max_horizontal_speed", max_horizontal_speed);
+    // Drone commands
+    ros::param::get("anafi/max_vertical_speed", max_vertical_speed);
+    ros::param::get("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
+    ros::param::get("anafi/max_horizontal_speed", max_horizontal_speed);
     command_skycontroller << max_horizontal_speed/100*command_msg.x, -max_horizontal_speed/100*command_msg.y, max_vertical_speed/100*command_msg.z, -max_yaw_rotation_speed/100*command_msg.yaw;
     mode_skycontroller << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE),
-    	(command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
+            (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
     
     // Move gimbal
-    gimbal_command << 0, (float)command_msg.camera/100;
+    controller_gimbal_command << 0, (float)command_msg.camera/100;
 
     // Change zoom
-    zoom_command = -(float)command_msg.zoom/100;
+    controller_zoom_command = -(float)command_msg.zoom/100;
 
     // Swithch between manual and offboard
-    std_msgs::Bool offboard_msg;
-    if(command_msg.reset_camera){
-        offboard_msg.data = false;
-        offboard_publisher.publish(offboard_msg);
-    }
-    if(command_msg.reset_zoom){
-        offboard_msg.data = true;
-        offboard_publisher.publish(offboard_msg);
-    }
+    if(command_msg.reset_camera)
+        offboard_client.call(false_srv);
+    if(command_msg.reset_zoom)
+        offboard_client.call(true_srv);
 }
 
 void desiredPoseCallback(const anafi_autonomy::PoseCommand& command_msg){
@@ -245,22 +187,21 @@ void desiredTrajectoryCallback(const anafi_autonomy::PoseCommand& command_msg){ 
     //mode_offboard << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ANGLE;
 }
 
-void commandAxisCallback(const anafi_autonomy::AxesCommand& command_msg){
+void desiredCommandCallback(const anafi_autonomy::DesiredCommand& command_msg){
     command_offboard << (command_msg.horizontal_mode != COMMAND_NONE ? command_msg.x : command_offboard(0)), (command_msg.horizontal_mode != COMMAND_NONE ? command_msg.y : command_offboard(1)),
-    	(command_msg.vertical_mode != COMMAND_NONE ? command_msg.z : command_offboard(2)), (command_msg.heading_mode != COMMAND_NONE ? command_msg.yaw*M_PI/180 : command_offboard(3));
+            (command_msg.vertical_mode != COMMAND_NONE ? command_msg.z : command_offboard(2)), (command_msg.heading_mode != COMMAND_NONE ? command_msg.yaw*M_PI/180 : command_offboard(3));
     mode_offboard << command_msg.horizontal_mode, command_msg.vertical_mode, command_msg.heading_mode;
 }
 
-void commandCameraCallback(const anafi_autonomy::KeyboardCameraCommand& command_msg){
-    gimbal_command << command_msg.roll, command_msg.pitch;
-    zoom_command = command_msg.zoom;
+void keyboardCameraCallback(const anafi_autonomy::KeyboardCameraCommand& command_msg){
+    keyboard_gimbal_command << command_msg.roll, command_msg.pitch;
+    keyboard_zoom_command = command_msg.zoom;
 
-    anafi_autonomy::TakePhoto take_photo_srv;
     std_srvs::Empty empty_srv;
 
     switch(command_msg.action){
-	case 1:
-        take_photo_client.call(take_photo_srv);
+    case 1:
+        take_photo_client.call(empty_srv);
         break;
     case 2:
         start_recording_client.call(empty_srv);
@@ -268,11 +209,41 @@ void commandCameraCallback(const anafi_autonomy::KeyboardCameraCommand& command_
     case 3:
         stop_recording_client.call(empty_srv);
         break;
+    case 4:
+        download_media_client.call(empty_srv);
+        break;
     case 11:
         reset_zoom_client.call(empty_srv);
         reset_gimbal_client.call(empty_srv);
         break;
+    case 111:
+        calibrate_gimbal_client.call(empty_srv);
+        break;
     }
+}
+
+void offboardGimbalCallback(const geometry_msgs::Vector3& command_msg){
+    offboard_gimbal_command << command_msg.x, command_msg.y;
+}
+
+void offboardZoomCallback(const std_msgs::Float32& command_msg){
+    offboard_zoom_command = command_msg.data;
+}
+
+States resolveState(std::string input){
+   if(input == "LANDED") return LANDED;
+   if(input == "MOTOR_RAMPING") return MOTOR_RAMPING;
+   if(input == "USER_TAKEOFF") return USER_TAKEOFF;
+   if(input == "TAKINGOFF") return TAKINGOFF;
+   if(input == "HOVERING") return HOVERING;
+   if(input == "FLYING") return FLYING;
+   if(input == "LANDING") return LANDING;
+   if(input == "EMERGENCY") return EMERGENCY;
+   return INVALID;
+}
+
+void stateCallback(const std_msgs::StringConstPtr& state_msg){ // 'LANDED', 'MOTOR_RAMPING', 'USER_TAKEOFF', 'TAKINGOFF', 'HOVERING', 'FLYING', 'LANDING', 'EMERGENCY'
+    state = resolveState(state_msg->data);
 }
 
 // Constructor
@@ -281,45 +252,62 @@ SafeAnafi::SafeAnafi(int argc, char** argv){
     ros::NodeHandle node_handle;
 
     optitrack_subscriber = node_handle.subscribe("/optitrack/odometry", 1, optitrackCallback);
-    odometry_subscriber = node_handle.subscribe("/anafi/odometry", 1, odometryCallback);
-    command_subscriber = node_handle.subscribe("/keyboard/command_meta", 1, commandMetaCallback);
-    command_keyboard_subscriber = node_handle.subscribe("/keyboard/command_move", 1, commandKeyboardCallback);
-    command_camera_subscriber = node_handle.subscribe("/keyboard/command_camera", 1, commandCameraCallback);
-    skycontroller_subscriber = node_handle.subscribe("/skycontroller/command", 1, commandSkycontrollerCallback);
-    desired_pose_subscriber = node_handle.subscribe("/anafi/desired_pose", 1, desiredPoseCallback); // DEPRECATED
-    desired_velocity_subscriber = node_handle.subscribe("/anafi/desired_velocity", 1, desiredVelocityCallback); // DEPRECATED
-    desired_attitude_subscriber = node_handle.subscribe("/anafi/desired_attitude", 1, desiredAttitudeCallback); // DEPRECATED
-    desired_trajectory_subscriber = node_handle.subscribe("/anafi/desired_trajectory", 1, desiredTrajectoryCallback);
-    command_axis_subscriber = node_handle.subscribe("/anafi/command_offboard", 1, commandAxisCallback);
+    odometry_subscriber = node_handle.subscribe("drone/odometry", 1, odometryCallback);
+    action_subscriber = node_handle.subscribe("keyboard/action", 1, actionCallback);
+    command_keyboard_subscriber = node_handle.subscribe("keyboard/drone_command", 1, keyboardDroneCallback);
+    command_camera_subscriber = node_handle.subscribe("keyboard/camera_command", 1, keyboardCameraCallback);
+    skycontroller_subscriber = node_handle.subscribe("skycontroller/command", 1, commandSkycontrollerCallback);
+    desired_pose_subscriber = node_handle.subscribe("drone/desired_pose", 1, desiredPoseCallback); // DEPRECATED
+    desired_velocity_subscriber = node_handle.subscribe("drone/desired_velocity", 1, desiredVelocityCallback); // DEPRECATED
+    desired_attitude_subscriber = node_handle.subscribe("drone/desired_attitude", 1, desiredAttitudeCallback); // DEPRECATED
+    desired_trajectory_subscriber = node_handle.subscribe("drone/desired_trajectory", 1, desiredTrajectoryCallback);
+    command_axis_subscriber = node_handle.subscribe("drone/desired_command", 1, desiredCommandCallback);
+    gimbal_command_subscriber = node_handle.subscribe("drone/desired_gimbal", 1, offboardGimbalCallback);
+    zoom_command_subscriber = node_handle.subscribe("drone/desired_zoom", 1, offboardZoomCallback);
+    state_subscriber = node_handle.subscribe("drone/state", 1, stateCallback);
 
-    emergency_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/emergency", 1);
-    takeoff_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/takeoff", 1);
-    land_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/land", 1);
-    rth_publisher = node_handle.advertise<std_msgs::Empty>("/anafi/rth", 1);
-    offboard_publisher = node_handle.advertise<std_msgs::Bool>("/anafi/offboard", 1);
-    moveto_publisher = node_handle.advertise<anafi_autonomy::MoveToCommand>("/anafi/cmd_moveto", 1);
-    moveby_publisher = node_handle.advertise<anafi_autonomy::MoveByCommand>("/anafi/cmd_moveby", 1);
-    rpyg_publisher = node_handle.advertise<anafi_autonomy::PilotingCommand>("/anafi/cmd_rpyt", 1);
-    camera_publisher = node_handle.advertise<anafi_autonomy::CameraCommand>("/anafi/cmd_camera", 1);
-    gimbal_publisher = node_handle.advertise<anafi_autonomy::GimbalCommand>("/anafi/cmd_gimbal", 1);
-    euler_publisher = node_handle.advertise<geometry_msgs::Vector3>("/anafi/euler", 1);
-    odometry_publisher = node_handle.advertise<nav_msgs::Odometry>("/anafi/ground_truth/odometry", 1);
-    desired_velocity_publisher = node_handle.advertise<geometry_msgs::TwistStamped>("/anafi/debug/desired_velocity", 1);
-    acceleration_publisher = node_handle.advertise<geometry_msgs::Vector3Stamped>("/anafi/debug/acceleration", 1);
-    mode_publisher = node_handle.advertise<geometry_msgs::Vector3Stamped>("/anafi/debug/mode", 1);
+    moveto_publisher = node_handle.advertise<anafi_autonomy::MoveToCommand>("drone/moveto", 1);
+    moveby_publisher = node_handle.advertise<anafi_autonomy::MoveByCommand>("drone/moveby", 1);
+    rpyg_publisher = node_handle.advertise<anafi_autonomy::PilotingCommand>("drone/rpyt", 1);
+    camera_publisher = node_handle.advertise<anafi_autonomy::CameraCommand>("camera/cmd", 1);
+    gimbal_publisher = node_handle.advertise<anafi_autonomy::GimbalCommand>("gimbal/cmd", 1);
+    odometry_publisher = node_handle.advertise<nav_msgs::Odometry>("drone/ground_truth/odometry", 1);
+    desired_velocity_publisher = node_handle.advertise<geometry_msgs::TwistStamped>("drone/debug/desired_velocity", 1);
+    acceleration_publisher = node_handle.advertise<geometry_msgs::Vector3Stamped>("drone/debug/acceleration", 1);
+    mode_publisher = node_handle.advertise<geometry_msgs::Vector3Stamped>("drone/debug/mode", 1);
 
-    take_photo_client = node_handle.serviceClient<anafi_autonomy::TakePhoto>("take_photo");
+    emergency_client = node_handle.serviceClient<std_srvs::Empty>("emergency");
+    halt_client = node_handle.serviceClient<std_srvs::Empty>("halt");
+    takeoff_client = node_handle.serviceClient<std_srvs::Empty>("takeoff");
+    arm_client = node_handle.serviceClient<std_srvs::SetBool>("arm");
+    land_client = node_handle.serviceClient<std_srvs::Empty>("land");
+    rth_client = node_handle.serviceClient<std_srvs::Empty>("rth");
+    flightplan_upload_client = node_handle.serviceClient<anafi_autonomy::FlightPlan>("flightplan_upload");
+    flightplan_start_client = node_handle.serviceClient<anafi_autonomy::FlightPlan>("flightplan_start");
+    flightplan_pause_client = node_handle.serviceClient<std_srvs::Empty>("flightplan_pause");
+    flightplan_stop_client = node_handle.serviceClient<std_srvs::Empty>("flightplan_stop");
+    followme_start_client = node_handle.serviceClient<anafi_autonomy::FollowMe>("followme_start");
+    followme_stop_client = node_handle.serviceClient<std_srvs::Empty>("followme_stop");
+    offboard_client = node_handle.serviceClient<std_srvs::SetBool>("offboard");
+    calibrate_magnetometer_client = node_handle.serviceClient<std_srvs::Empty>("calibrate_magnetometer");
+    calibrate_gimbal_client = node_handle.serviceClient<std_srvs::Empty>("calibrate_gimbal");
+    take_photo_client = node_handle.serviceClient<std_srvs::Empty>("take_photo");
     start_recording_client = node_handle.serviceClient<std_srvs::Empty>("start_recording");
     stop_recording_client = node_handle.serviceClient<std_srvs::Empty>("stop_recording");
     reset_zoom_client = node_handle.serviceClient<std_srvs::Empty>("reset_zoom");
     reset_gimbal_client = node_handle.serviceClient<std_srvs::Empty>("reset_gimbal");
+    download_media_client = node_handle.serviceClient<std_srvs::Empty>("download_media");
+    reboot_client = node_handle.serviceClient<std_srvs::Empty>("reboot");
 
-    ros::param::get("/safe_anafi/bounds/min_x", bounds(0,0));
-    ros::param::get("/safe_anafi/bounds/min_y", bounds(0,1));
-    ros::param::get("/safe_anafi/bounds/min_z", bounds(0,2));
-    ros::param::get("/safe_anafi/bounds/max_x", bounds(1,0));
-    ros::param::get("/safe_anafi/bounds/max_y", bounds(1,1));
-    ros::param::get("/safe_anafi/bounds/max_z", bounds(1,2));
+    ros::param::get("safe_anafi/bounds/min_x", bounds(0,0));
+    ros::param::get("safe_anafi/bounds/min_y", bounds(0,1));
+    ros::param::get("safe_anafi/bounds/min_z", bounds(0,2));
+    ros::param::get("safe_anafi/bounds/max_x", bounds(1,0));
+    ros::param::get("safe_anafi/bounds/max_y", bounds(1,1));
+    ros::param::get("safe_anafi/bounds/max_z", bounds(1,2));
+
+    false_srv.request.data = false;
+    true_srv.request.data = true;
     
     Twist t;
     velocities.clear();
@@ -330,13 +318,11 @@ SafeAnafi::SafeAnafi(int argc, char** argv){
 // Destructor
 SafeAnafi::~SafeAnafi(){
     ROS_INFO("SafeAnafi is stopping...");
-    std_msgs::Empty empty_msg;
     anafi_autonomy::PilotingCommand rpyg_msg;
     rpyg_publisher.publish(rpyg_msg);
     rpyg_publisher.publish(rpyg_msg);
-    land_publisher.publish(empty_msg);
-    land_publisher.publish(empty_msg);
-    land = true;
+    land_client.call(empty_srv);
+    land_client.call(empty_srv);
 
     ros::shutdown();
     exit(0);
@@ -348,6 +334,281 @@ double denormalizeAngle(double a1, double a2){
     return a1;
 }
 
+void controllers(){
+    command_move <<
+            (mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(0) : 0))),
+            (mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(1) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(1) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(1) : 0))),
+            (mode_skycontroller(1) != COMMAND_NONE ? command_skycontroller(2) : (mode_keyboard(1) != COMMAND_NONE ? command_keyboard(2) : (mode_offboard(1) != COMMAND_NONE ? command_offboard(2) : 0))),
+            (mode_skycontroller(2) != COMMAND_NONE ? command_skycontroller(3) : (mode_keyboard(2) != COMMAND_NONE ? command_keyboard(3) : (mode_offboard(2) != COMMAND_NONE ? command_offboard(3) : 0)));
+    mode_move <<
+            (mode_skycontroller(0) != COMMAND_NONE ? mode_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? mode_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? mode_offboard(0) : COMMAND_VELOCITY))),
+            (mode_skycontroller(1) != COMMAND_NONE ? mode_skycontroller(1) : (mode_keyboard(1) != COMMAND_NONE ? mode_keyboard(1) : (mode_offboard(1) != COMMAND_NONE ? mode_offboard(1) : COMMAND_VELOCITY))),
+            (mode_skycontroller(2) != COMMAND_NONE ? mode_skycontroller(2) : (mode_keyboard(2) != COMMAND_NONE ? mode_keyboard(2) : (mode_offboard(2) != COMMAND_NONE ? mode_offboard(2) : COMMAND_RATE)));
+
+    switch(mode_move(MODE_HORIZONTAL)){ // horizotal
+    case COMMAND_NONE: // no command
+        rpyg_msg.roll = 0;
+        rpyg_msg.pitch = 0;
+        break;
+    case COMMAND_POSITION: // position
+        if(localization){
+            command_move(0) = BOUND(command_move(0), bounds(0,0), bounds(1,0));
+            command_move(1) = BOUND(command_move(1), bounds(0,1), bounds(1,1));
+            // TODO: IMPLEMENT POSITION CONTROLLER HERE
+        }
+        else{
+            command_move(0) = 0;
+            command_move(1) = 0;
+            // TODO: THROW A WARNING, IF NO LOCALISATION
+        }
+    case COMMAND_VELOCITY: // velocity
+        ros::param::get("anafi/max_horizontal_speed", max_horizontal_speed);
+        command_move(0) = BOUND(command_move(0), max_horizontal_speed);
+        command_move(1) = BOUND(command_move(1), max_horizontal_speed);
+
+        if(fixed_frame)
+            command_move << cos(yaw)*command_move(0) + sin(yaw)*command_move(1), -sin(yaw)*command_move(0) + cos(yaw)*command_move(1),
+                    command_move(2), command_move(3); // rotate command from world frame to body frame
+
+        velocity_error << command_move(0) - velocity(0), command_move(1) - velocity(1), 0;
+        velocity_error_d = -acceleration;
+
+        command_move(0) = -(k_p_velocity*velocity_error(1) + k_d_velocity*velocity_error_d(1));
+        command_move(1) =   k_p_velocity*velocity_error(0) + k_d_velocity*velocity_error_d(0);
+    case COMMAND_ANGLE: // attitude
+        ros::param::get("anafi/max_tilt", max_tilt);
+        command_move(0) = BOUND(command_move(0), max_tilt);
+        command_move(1) = BOUND(command_move(1), max_tilt);
+        rpyg_msg.roll = command_move(0);
+        rpyg_msg.pitch = command_move(1);
+        break;
+    default:
+        rpyg_msg.roll = 0;
+        rpyg_msg.pitch = 0;
+        ROS_WARN_STREAM_THROTTLE(1, "Undefined horizontal mode (" << mode_move(MODE_HORIZONTAL) << ").");
+        ROS_WARN_STREAM_THROTTLE(1, "It should be '0' for no command, '1' for position command, '2' for velocity command or '3' for attitude command.");
+    }
+
+    switch(mode_move(MODE_VERTICAL)){ // vertical
+    case COMMAND_NONE: // no command
+        rpyg_msg.gaz = 0;
+        break;
+    case COMMAND_POSITION: // position
+        command_move(2) = BOUND(command_move(2), bounds(0,2), bounds(1,2));
+        position_error(2) = command_move(2) - position(2);
+        position_error_d(2) = -velocity(2);
+        position_error_i(2) = BOUND(position_error_i(2) + position_error(2)*dt, max_i_position);
+        command_move(2) = k_p_position*position_error(2) + k_i_position*position_error_i(2) + k_d_position*position_error_d(2);
+    case COMMAND_VELOCITY: // velocity
+        ros::param::get("anafi/max_vertical_speed", max_vertical_speed);
+        command_move(2) = BOUND(command_move(2), max_vertical_speed);
+        rpyg_msg.gaz = command_move(2);
+        break;
+    default:
+        rpyg_msg.gaz = 0;
+        ROS_WARN_STREAM_THROTTLE(1, "Undefined vertical mode (" << mode_move(MODE_VERTICAL) << ").");
+        ROS_WARN_STREAM_THROTTLE(1, "It should be '0' for no command, '1' for position command or '2' for velocity command.");
+    }
+
+    switch(mode_move(MODE_HEADING)){ // heading
+    case COMMAND_NONE: // no command
+        rpyg_msg.yaw = 0;
+        break;
+    case COMMAND_ANGLE: // attitude
+        yaw = denormalizeAngle(yaw, command_move(3));
+        command_move(3) = k_p_yaw*(command_move(3) - yaw);
+    case COMMAND_RATE: // angular rate
+        ros::param::get("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
+        command_move(3) = BOUND(command_move(3), max_yaw_rotation_speed);
+        rpyg_msg.yaw = command_move(3);
+        break;
+    default:
+        rpyg_msg.yaw = 0;
+        ROS_WARN_STREAM_THROTTLE(1, "Undefined heading mode (" << mode_move(MODE_HEADING) << ").");
+        ROS_WARN_STREAM_THROTTLE(1, "It should be '0' for no command, '3' for yaw command or '4' for rate command.");
+    }
+
+    rpyg_msg.header.stamp = ros::Time::now();
+    rpyg_msg.header.frame_id = "body";
+    rpyg_publisher.publish(rpyg_msg);
+}
+
+void stateMachine(){
+    // State-indipendent actions
+    switch(action){
+    case DISARM: // emergency
+        emergency_client.call(empty_srv);
+        return;
+    case RESET_POSE:
+        ROS_INFO("Reseting position and heading");
+        position << 0, 0, 0;
+        initial_yaw = yaw;
+        return;
+    case REMOTE_CONTROL:
+        offboard_client.call(false_srv);
+        return;
+    case OFFBOARD_CONTROL:
+        offboard_client.call(true_srv);
+        return;
+    }
+
+    switch(state){
+    case LANDED:
+        switch(action){
+        case ARM:
+            if(hand_launch)
+                arm_client.call(true_srv);
+            else{
+                armed = !armed;
+                if(armed)
+                    ROS_WARN("Armed");
+                else
+                    ROS_INFO("Disarmed");
+            }
+            break;
+        case TAKEOFF:
+            if(armed)
+                takeoff_client.call(empty_srv);
+            else
+                ROS_WARN("Arm the drone with 'Insert' before taking-off.");
+            armed = false;
+            break;
+        case MISSION_START:
+            if(mission_type == 0){ // flight plan
+                if(armed){
+                    anafi_autonomy::FlightPlan flightplan_srv;
+                    flightplan_srv.request.filepath = flightplan_file;
+                    flightplan_srv.request.uid = "";
+                    flightplan_upload_client.call(flightplan_srv);
+                    flightplan_start_client.call(flightplan_srv);
+                }
+                else
+                    ROS_WARN("Arm the drone with 'Insert' before starting the mission.");
+                armed = false;
+            }
+            else
+                ROS_WARN("The drone has to be in the air.");
+            break;
+        case REBOOT:
+            reboot_client.call(empty_srv);
+            break;
+        case CALIBRATE:
+            calibrate_magnetometer_client.call(empty_srv);
+            break;
+        }
+        break;
+    case MOTOR_RAMPING:
+        switch(action){
+        case ARM: // disarm
+        case LAND:
+        case HALT:
+            arm_client.call(false_srv);
+            break;
+        }
+        break;
+    case USER_TAKEOFF:
+        switch(action){
+        case ARM: // disarm
+        case LAND:
+        case HALT:
+            arm_client.call(false_srv);
+            break;
+        case TAKEOFF:
+            arm_client.call(false_srv); // needs to stop the motors before taking off
+            takeoff_client.call(empty_srv);
+            break;
+        }
+        break;
+    case TAKINGOFF:
+        switch(action){
+        case LAND:
+        case HALT:
+            land_client.call(empty_srv);
+            break;
+        default:
+            if(takingoff_control)
+                controllers();
+        }
+        break;
+    case HOVERING:
+    case FLYING:
+        switch(action){
+        case LAND:
+            land_client.call(empty_srv);
+            break;
+        case RTH: // return-to-home
+            rth_client.call(empty_srv);
+            break;
+        case MISSION_START:
+            if(mission_type == 0){ // flight plan
+                anafi_autonomy::FlightPlan flightplan_srv;
+                flightplan_srv.request.filepath = flightplan_file;
+                flightplan_srv.request.uid = "";
+                flightplan_upload_client.call(flightplan_srv);
+                flightplan_start_client.call(flightplan_srv);
+            }
+            else{ // follow me
+                anafi_autonomy::FollowMe followme_srv;
+                followme_srv.request.mode = followme_mode;
+                followme_srv.request.horizontal = 2;
+                followme_srv.request.vertical = 10;
+                followme_srv.request.target_azimuth = 0;
+                followme_srv.request.target_elevation = 45;
+                followme_srv.request.change_of_scale = 0;
+                followme_srv.request.confidence_index = 255;
+                followme_srv.request.is_new_selection = true;
+                followme_start_client.call(followme_srv);
+            }
+            break;
+        case MISSION_PAUSE:
+            flightplan_pause_client.call(empty_srv);
+            break;
+        case MISSION_STOP:
+            if(mission_type == 0) // flight plan
+                flightplan_stop_client.call(empty_srv);
+            else // follow me
+                followme_stop_client.call(empty_srv);
+            break;
+        case HALT:
+            halt_client.call(empty_srv);
+            // TODO: set velocities to 0
+            break;
+        default:
+            controllers();
+        }
+        break;
+    case LANDING:
+        switch(action){
+        case TAKEOFF:
+        case HALT:
+            takeoff_client.call(empty_srv);
+            break;
+        default:
+            if(landing_control)
+                controllers();
+        }
+        break;
+    case EMERGENCY:
+        switch(action){
+        case TAKEOFF:
+        case HALT:
+            takeoff_client.call(empty_srv);
+            break;
+        }
+    case INVALID:
+        switch(action){
+        case HALT:
+            takeoff_client.call(empty_srv);
+            break;
+        case REBOOT:
+            reboot_client.call(empty_srv);
+            break;
+        }
+    }
+
+    action = NONE;
+}
+
 void SafeAnafi::run(){
     ROS_INFO("SafeAnafi is running...");
 
@@ -357,114 +618,21 @@ void SafeAnafi::run(){
     f = boost::bind(&dynamicReconfigureCallback, _1, _2);
     server.setCallback(f);
 
-    double dt = (double)1/100;
+    dt = (double)1/100;
     ros::Rate rate((double)1/dt);
-    
-    anafi_autonomy::PilotingCommand rpyg_msg;
 
     while(ros::ok()){
         ros::spinOnce();
 
-        command_move << 
-   (mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(0) : 0))), 
-   (mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(1) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(1) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(1) : 0))), 
-   (mode_skycontroller(1) != COMMAND_NONE ? command_skycontroller(2) : (mode_keyboard(1) != COMMAND_NONE ? command_keyboard(2) : (mode_offboard(1) != COMMAND_NONE ? command_offboard(2) : 0))), 
-   (mode_skycontroller(2) != COMMAND_NONE ? command_skycontroller(3) : (mode_keyboard(2) != COMMAND_NONE ? command_keyboard(3) : (mode_offboard(2) != COMMAND_NONE ? command_offboard(3) : 0)));
-        mode_move << 
-   (mode_skycontroller(0) != COMMAND_NONE ? mode_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? mode_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? mode_offboard(0) : COMMAND_VELOCITY))), 
-   (mode_skycontroller(1) != COMMAND_NONE ? mode_skycontroller(1) : (mode_keyboard(1) != COMMAND_NONE ? mode_keyboard(1) : (mode_offboard(1) != COMMAND_NONE ? mode_offboard(1) : COMMAND_VELOCITY))), 
-   (mode_skycontroller(2) != COMMAND_NONE ? mode_skycontroller(2) : (mode_keyboard(2) != COMMAND_NONE ? mode_keyboard(2) : (mode_offboard(2) != COMMAND_NONE ? mode_offboard(2) : COMMAND_RATE)));
+        stateMachine();
 
-		switch(mode_move(MODE_HORIZONTAL)){ // horizotal
-		case COMMAND_NONE: // no command
-			rpyg_msg.roll = 0;
-			rpyg_msg.pitch = 0;
-			break;
-		case COMMAND_POSITION: // position
-			if(localization){
-				command_move(0) = BOUND(command_move(0), bounds(0,0), bounds(1,0));
-				command_move(1) = BOUND(command_move(1), bounds(0,1), bounds(1,1));
-				// TODO: IMPLEMENT POSITION CONTROLLER HERE
-			}
-			else{
-				command_move(0) = 0;
-				command_move(1) = 0;
-				// TODO: THROW A WARNING, IF NO LOCALISATION
-			}
-		case COMMAND_VELOCITY: // velocity
-			ros::param::get("/anafi/max_horizontal_speed", max_horizontal_speed);
-			command_move(0) = BOUND(command_move(0), max_horizontal_speed);
-			command_move(1) = BOUND(command_move(1), max_horizontal_speed);
-            
-			if(fixed_frame)
-				command_move << cos(yaw)*command_move(0) + sin(yaw)*command_move(1), -sin(yaw)*command_move(0) + cos(yaw)*command_move(1),
-					command_move(2), command_move(3); // rotate command from world frame to body frame
-                        
-			velocity_error << command_move(0) - velocity(0), command_move(1) - velocity(1), 0;
-			velocity_error_d = -acceleration;
-
-			command_move(0) = -(k_p_velocity*velocity_error(1) + k_d_velocity*velocity_error_d(1));
-			command_move(1) =   k_p_velocity*velocity_error(0) + k_d_velocity*velocity_error_d(0);
-		case COMMAND_ANGLE: // attitude
-			ros::param::get("/anafi/max_tilt", max_tilt);
-			command_move(0) = BOUND(command_move(0), max_tilt);
-			command_move(1) = BOUND(command_move(1), max_tilt);
-			rpyg_msg.roll = command_move(0);
-			rpyg_msg.pitch = command_move(1);
-			break;
-		default:
-			rpyg_msg.roll = 0;
-			rpyg_msg.pitch = 0;
-			ROS_WARN_STREAM_THROTTLE(1, "Undefined horizontal mode (" << mode_move(MODE_HORIZONTAL) << ").");
-			ROS_WARN_STREAM_THROTTLE(1, "It should be '0' for no command, '1' for position command, '2' for velocity command or '3' for attitude command.");
-		}
-            
-		switch(mode_move(MODE_VERTICAL)){ // vertical
-		case COMMAND_NONE: // no command
-			rpyg_msg.gaz = 0;
-			break;
-		case COMMAND_POSITION: // position
-			command_move(2) = BOUND(command_move(2), bounds(0,2), bounds(1,2));
-			position_error(2) = command_move(2) - position(2);
-			position_error_d(2) = -velocity(2);
-			position_error_i(2) = BOUND(position_error_i(2) + position_error(2)*dt, max_i_position);
-			command_move(2) = k_p_position*position_error(2) + k_i_position*position_error_i(2) + k_d_position*position_error_d(2);
-		case COMMAND_VELOCITY: // velocity
-			ros::param::get("/anafi/max_vertical_speed", max_vertical_speed);
-			command_move(2) = BOUND(command_move(2), max_vertical_speed);
-			rpyg_msg.gaz = command_move(2);
-			break;
-		default:
-			rpyg_msg.gaz = 0;
-			ROS_WARN_STREAM_THROTTLE(1, "Undefined vertical mode (" << mode_move(MODE_VERTICAL) << ").");
-			ROS_WARN_STREAM_THROTTLE(1, "It should be '0' for no command, '1' for position command or '2' for velocity command.");
-		}
-            
-		switch(mode_move(MODE_HEADING)){ // heading
-		case COMMAND_NONE: // no command
-			rpyg_msg.yaw = 0;
-			break;
-		case COMMAND_ANGLE: // attitude
-			yaw = denormalizeAngle(yaw, command_move(3));
-			command_move(3) = k_p_yaw*(command_move(3) - yaw);
-		case COMMAND_RATE: // angular rate
-			ros::param::get("/anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
-			command_move(3) = BOUND(command_move(3), max_yaw_rotation_speed);
-			rpyg_msg.yaw = command_move(3);
-			break;
-		default:
-			rpyg_msg.yaw = 0;
-			ROS_WARN_STREAM_THROTTLE(1, "Undefined heading mode (" << mode_move(MODE_HEADING) << ").");
-			ROS_WARN_STREAM_THROTTLE(1, "It should be '0' for no command, '3' for yaw command or '4' for rate command.");
-		}
-
-        //if(!land) // to prevent sending commands while landing
-            rpyg_msg.header.stamp = ros::Time::now();
-            rpyg_msg.header.frame_id = "/body";
-            rpyg_publisher.publish(rpyg_msg);
-            
         // Move gimbal
+        gimbal_command <<   (controller_gimbal_command(0) != 0 ? controller_gimbal_command(0) : (keyboard_gimbal_command(0) != 0 ? keyboard_gimbal_command(0) : offboard_gimbal_command(0))),
+                            (controller_gimbal_command(1) != 0 ? controller_gimbal_command(1) : (keyboard_gimbal_command(1) != 0 ? keyboard_gimbal_command(1) : offboard_gimbal_command(1)));
+
         anafi_autonomy::GimbalCommand gimbal_msg;
+        gimbal_msg.header.stamp = ros::Time::now();
+        gimbal_msg.header.frame_id = "body";
         gimbal_msg.mode = 1;
         if(!gimbal_command.isZero()){
             gimbal_msg.roll = gimbal_command(0);
@@ -479,7 +647,11 @@ void SafeAnafi::run(){
             }
 
         // Zoom
+        zoom_command = (controller_zoom_command != 0 ? controller_zoom_command : (keyboard_zoom_command != 0 ? keyboard_zoom_command : offboard_zoom_command));
+
         anafi_autonomy::CameraCommand camera_msg;
+        camera_msg.header.stamp = ros::Time::now();
+        camera_msg.header.frame_id = "gimbal";
         camera_msg.mode = 1;
         if(zoom_command != 0){
             camera_msg.zoom = zoom_command;
@@ -491,7 +663,7 @@ void SafeAnafi::run(){
                 camera_publisher.publish(camera_msg);
                 stop_zoom = true;
             }
-            
+
         geometry_msgs::Vector3Stamped acceleration_msg; // FOR DEBUG
         acceleration_msg.header.stamp = ros::Time::now(); // FOR DEBUG
         acceleration_msg.vector.x = acceleration(0); // FOR DEBUG

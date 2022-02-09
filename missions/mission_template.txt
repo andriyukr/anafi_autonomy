@@ -1,0 +1,20 @@
+QGC	WPL	120
+https://mavlink.io/en/messages/common.html 									# remove this line #
+<INDEX> 													# remove this line #
+|	<CURRENT WP> 												# remove this line #
+|	|	<COORD FRAME> 											# remove this line #
+|	|	|	<COMMAND> 										# remove this line #
+|	|	|	|	<PARAM1> 									# remove this line #
+|	|	|	|	|	<PARAM2> 								# remove this line #
+|	|	|	|	|	|	<PARAM3> 							# remove this line #
+|	|	|	|	|	|	|	<PARAM4> 						# remove this line #
+|	|	|	|	|	|	|	|	<PARAM5/X/LATITUDE> 				# remove this line #
+|	|	|	|	|	|	|	|	|	<PARAM6/Y/LONGITUDE> 			# remove this line #
+|	|	|	|	|	|	|	|	|	|	<PARAM7/Z/ALTITUDE> 		# remove this line #
+|	|	|	|	|	|	|	|	|	|	|	<AUTOCONTINUE> 	# remove this line #
+|	|	|	|	|	|	|	|	|	|	|	|  			# remove this line #
+0	0	0	223	1	1	0	0	0	0	0	1
+1	0	0	24	0	0	1	0	0	0	1	1
+2	0	0	93	10	0	0	0	0	0	0	1
+3	0	0	23	0	0	1	0	0	0	0	1
+4	0	0	223	0	0	0	0	0	0	0	1
