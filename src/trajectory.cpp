@@ -25,9 +25,9 @@ Trajectory::Trajectory(int argc, char** argv){
     ros::NodeHandle node_handle;
     
     // Publishers
-    pose_publisher = node_handle.advertise<anafi_autonomy::PoseCommand>("drone/reference_pose", 1);
-    velocity_publisher = node_handle.advertise<anafi_autonomy::VelocityCommand>("drone/reference_velocity", 1);
-    axes_publisher = node_handle.advertise<anafi_autonomy::AxesCommand>("drone/command_offboard", 1);
+    pose_publisher = node_handle.advertise<anafi_autonomy::PoseCommand>("/anafi/reference_pose", 1);
+    velocity_publisher = node_handle.advertise<anafi_autonomy::VelocityCommand>("/anafi/reference_velocity", 1);
+    axes_publisher = node_handle.advertise<anafi_autonomy::AxesCommand>("/anafi/command_offboard", 1);
 }
 
 // Destructor

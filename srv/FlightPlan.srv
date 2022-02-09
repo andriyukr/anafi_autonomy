@@ -1,3 +1,0 @@
-string filepath 	# flight plan file path on local computer
-string uid 		# flight plan uid in drone flightplans directory
----
