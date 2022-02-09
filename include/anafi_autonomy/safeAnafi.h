@@ -3,9 +3,9 @@
 #include <fstream>
 #include <vector>
 #include <Eigen/Dense>
+#include <std_msgs/Empty.h>
+#include <std_msgs/Bool.h>
 #include <std_msgs/Int8.h>
-#include <std_msgs/Float32.h>
-#include <std_msgs/String.h>
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -17,23 +17,21 @@
 #include <tf/transform_datatypes.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <std_srvs/Empty.h>
-#include <std_srvs/SetBool.h>
 #include <dynamic_reconfigure/server.h>
 #include <anafi_autonomy/setSafeAnafiConfig.h>
 #include <anafi_autonomy/PoseCommand.h>
 #include <anafi_autonomy/VelocityCommand.h>
 #include <anafi_autonomy/AttitudeCommand.h>
-#include <anafi_autonomy/DesiredCommand.h>
+#include <anafi_autonomy/AxesCommand.h>
 #include <anafi_autonomy/PilotingCommand.h>
 #include <anafi_autonomy/MoveToCommand.h>
 #include <anafi_autonomy/MoveByCommand.h>
 #include <anafi_autonomy/CameraCommand.h>
 #include <anafi_autonomy/GimbalCommand.h>
 #include <anafi_autonomy/SkyControllerCommand.h>
-#include <anafi_autonomy/KeyboardDroneCommand.h>
+#include <anafi_autonomy/KeyboardMoveCommand.h>
 #include <anafi_autonomy/KeyboardCameraCommand.h>
-#include <anafi_autonomy/FlightPlan.h>
-#include <anafi_autonomy/FollowMe.h>
+#include <anafi_autonomy/TakePhoto.h>
 
 #define FILTER_SIZE 		3
 #define COMMAND_NONE 		0
@@ -55,40 +53,8 @@ using namespace std;
 using namespace ros;
 using namespace Eigen;
 
-enum States{
-	LANDED,
-	MOTOR_RAMPING,
-	USER_TAKEOFF,
-	TAKINGOFF,
-	HOVERING,
-	FLYING,
-	LANDING,
-	EMERGENCY,
-	INVALID
-};
-States state = LANDED;
-
-enum Actions{
-	NONE = 0,
-	ARM = 1,
-	TAKEOFF = 2,
-	LAND = 4,
-	DISARM = 5,
-	HALT = 3,
-	RESET_POSE = 6,
-	RTH = 7,
-	MISSION_START = 11,
-	MISSION_PAUSE = 12,
-	MISSION_STOP = 13,
-	REMOTE_CONTROL = 101,
-	OFFBOARD_CONTROL = 102,
-	REBOOT = 110,
-	CALIBRATE = 111
-};
-Actions action;
-
 // Subsribers
-Subscriber action_subscriber;
+Subscriber command_subscriber;
 Subscriber command_keyboard_subscriber;
 Subscriber command_camera_subscriber;
 Subscriber skycontroller_subscriber;
@@ -97,67 +63,43 @@ Subscriber desired_velocity_subscriber;
 Subscriber desired_attitude_subscriber;
 Subscriber desired_trajectory_subscriber;
 Subscriber command_axis_subscriber;
-Subscriber gimbal_command_subscriber;
-Subscriber zoom_command_subscriber;
 Subscriber optitrack_subscriber;
 Subscriber aruco_subscriber;
 Subscriber gps_subscriber;
 Subscriber odometry_subscriber;
-Subscriber state_subscriber;
 
 // Publishers
+Publisher emergency_publisher;
+Publisher takeoff_publisher;
+Publisher land_publisher;
+Publisher rth_publisher;
+Publisher offboard_publisher;
 Publisher moveto_publisher;
 Publisher moveby_publisher;
 Publisher rpyg_publisher;
 Publisher camera_publisher;
 Publisher gimbal_publisher;
+Publisher euler_publisher;
 Publisher odometry_publisher;
 Publisher desired_velocity_publisher;
 Publisher acceleration_publisher;
 Publisher mode_publisher;
 
 // Clients
-ServiceClient emergency_client;
-ServiceClient halt_client;
-ServiceClient arm_client;
-ServiceClient takeoff_client;
-ServiceClient land_client;
-ServiceClient rth_client;
-ServiceClient flightplan_upload_client;
-ServiceClient flightplan_start_client;
-ServiceClient flightplan_pause_client;
-ServiceClient flightplan_stop_client;
-ServiceClient followme_start_client;
-ServiceClient followme_stop_client;
-ServiceClient offboard_client;
-ServiceClient take_photo_client;
-ServiceClient start_recording_client;
-ServiceClient stop_recording_client;
-ServiceClient reset_zoom_client;
-ServiceClient reset_gimbal_client;
-ServiceClient download_media_client;
-ServiceClient calibrate_magnetometer_client;
-ServiceClient calibrate_gimbal_client;
-ServiceClient reboot_client;
-
-// Messages
-anafi_autonomy::PilotingCommand rpyg_msg;
-
-// Services
-std_srvs::Empty empty_srv;
-std_srvs::SetBool true_srv;
-std_srvs::SetBool false_srv;
+ros::ServiceClient take_photo_client;
+ros::ServiceClient start_recording_client;
+ros::ServiceClient stop_recording_client;
+ros::ServiceClient reset_zoom_client;
+ros::ServiceClient reset_gimbal_client;
 
 // Flags
-bool armed = false;
+bool arm = false;
+bool land = true;
 bool localization = false;
 bool fixed_frame = false;
 bool world_frame = false;
 bool stop_gimbal = false;
 bool stop_zoom = false;
-bool hand_launch = false;
-bool takingoff_control = false;
-bool landing_control = false;
 
 // Position
 Vector3d position = Vector3d::Zero();
@@ -199,13 +141,7 @@ Vector3i mode_skycontroller = Vector3i::Zero();
 Vector3i mode_offboard = Vector3i::Zero();
 Vector3i mode_move = Vector3i::Zero();
 Vector2d gimbal_command = Vector2d::Zero();
-Vector2d controller_gimbal_command = Vector2d::Zero();
-Vector2d keyboard_gimbal_command = Vector2d::Zero();
-Vector2d offboard_gimbal_command = Vector2d::Zero();
 double zoom_command = 0;
-double controller_zoom_command = 0;
-double keyboard_zoom_command = 0;
-double offboard_zoom_command = 0;
 
 // Gains
 double k_p_position = 0;
@@ -222,13 +158,8 @@ double max_tilt;
 double max_vertical_speed;
 double max_horizontal_speed;
 double max_yaw_rotation_speed;
-short mission_type = 0;
-string flightplan_file;
-short followme_mode = 0;
 
-// Time
 Time time_old;
-double dt;
 
 class SafeAnafi{
     public:
