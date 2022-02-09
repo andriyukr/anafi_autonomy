@@ -20,7 +20,7 @@ catkin_python_setup()
 
 add_message_files(
   FILES
-  AxesCommand.msg
+  DesiredCommand.msg
   PoseCommand.msg
   VelocityCommand.msg
   AttitudeCommand.msg
@@ -30,13 +30,18 @@ add_message_files(
   SkyControllerCommand.msg 
   CameraCommand.msg
   GimbalCommand.msg
-  KeyboardMoveCommand.msg
+  KeyboardDroneCommand.msg
   KeyboardCameraCommand.msg
+  TargetTrajectory.msg
 )
 
 add_service_files(
   FILES
-  TakePhoto.srv
+  PilotedPOI.srv
+  FlightPlan.srv
+  FollowMe.srv
+  Location.srv
+  String.srv
 )
 
 generate_messages(

@@ -14,7 +14,8 @@
 #include <termios.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <anafi_autonomy/KeyboardMoveCommand.h>
+#include <chrono>
+#include <anafi_autonomy/KeyboardDroneCommand.h>
 #include <anafi_autonomy/KeyboardCameraCommand.h>
 
 #define KEYCODE_a       97
@@ -26,17 +27,30 @@
 #define KEYCODE_t       116
 #define KEYCODE_l       108
 #define KEYCODE_b       98
+#define KEYCODE_c       99
 #define KEYCODE_H       72
 #define KEYCODE_R       82
 #define KEYCODE_L       76
 
-#define KEYCODE_LEFT    68
-#define KEYCODE_RIGHT   67
-#define KEYCODE_UP      65
-#define KEYCODE_DOWN    66
+#define KEYCODE_LEFT    1792836
+#define KEYCODE_RIGHT   1792835
+#define KEYCODE_UP      1792833
+#define KEYCODE_DOWN    1792834
 #define KEYCODE_Esc     27
-#define KEYCODE_Insert  126
+#define KEYCODE_Insert  458961534
 #define KEYCODE_SPACE   32
+
+#define KEYCODE_F1      1789776
+#define KEYCODE_F2      1789777
+#define KEYCODE_F4      1789779
+#define KEYCODE_F5      117494068606
+#define KEYCODE_F6      117494069118
+#define KEYCODE_F7      117494069374
+#define KEYCODE_F8      117494069630
+#define KEYCODE_F9      117494132862
+#define KEYCODE_F12     117494133886
+
+#define KEYCODE_ACCENT  96
 
 #define KEYCODE_8       56
 #define KEYCODE_4       52
@@ -48,33 +62,28 @@
 #define KEYCODE_Enter   10
 #define KEYCODE_0       48
 #define KEYCODE_DOT     46
-
-#define KEYCODE_F1      80
-#define KEYCODE_F2      81
+#define KEYCODE_SLASH   47
 
 using namespace std;
 
 int kfd = 0;
-char c = 0;
-int seq = 1;
+unsigned long int key = 0;
 struct termios cooked, raw;
 
 class Teleop{
 private:
     ros::NodeHandle node_handle;
-    ros::Publisher command_publisher;
-    ros::Publisher move_publisher;
+    ros::Publisher action_publisher;
+    ros::Publisher drone_publisher;
     ros::Publisher camera_publisher;
-    std_msgs::Int8 command;
+    std_msgs::Int8 action;
 
 public:
     Teleop(){
-        command.data = 0;
-
         // Publishers
-        command_publisher = node_handle.advertise<std_msgs::Int8>("/keyboard/command_meta", 1);
-        move_publisher = node_handle.advertise<anafi_autonomy::KeyboardMoveCommand>("/keyboard/command_move", 1);
-        camera_publisher = node_handle.advertise<anafi_autonomy::KeyboardCameraCommand>("/keyboard/command_camera", 1);
+        action_publisher = node_handle.advertise<std_msgs::Int8>("keyboard/action", 1);
+        drone_publisher = node_handle.advertise<anafi_autonomy::KeyboardDroneCommand>("keyboard/drone_command", 1);
+        camera_publisher = node_handle.advertise<anafi_autonomy::KeyboardCameraCommand>("keyboard/camera_command", 1);
     }
 
     ~Teleop(){
@@ -84,19 +93,19 @@ public:
     }
 
     void keyLoop(){
-        ros::Rate rate(20);
+        ros::Rate rate(30);
 
         while(ros::ok()){
             rate.sleep();
 
-            anafi_autonomy::KeyboardMoveCommand move_msg;
+            action.data = 0;
+            anafi_autonomy::KeyboardDroneCommand drone_msg;
             anafi_autonomy::KeyboardCameraCommand camera_msg;
 
-            if(c != 0){
-                ROS_DEBUG_STREAM("key = " << (int)c << endl);
-            }
+            if(key != 0)
+                ROS_DEBUG_STREAM("(loop) key = " << key);
 
-            switch(c){
+            switch(key){
             case KEYCODE_H: // help
             case KEYCODE_h:
                 cout << "Press: \n";
@@ -114,82 +123,86 @@ public:
                 cout << "a \t - yaw clockwise \n";
                 cout << "d \t - yaw counterclockwise \n";
                 cout << "b \t - return to home \n";
-                cout << "SPACE \t - hover \n";
+                cout << "SPACE \t - halt \n";
                 cout << "r \t - reset pose \n";
                 break;
 
                 /* UAV commands */
             case KEYCODE_Insert: // arm
-                command.data = 1;
-                command_publisher.publish(command);
+                action.data = 1;               
                 break;
             case KEYCODE_t: // take-off
-                command.data = 2;
-                command_publisher.publish(command);
+                action.data = 2;
                 break;
-            case KEYCODE_SPACE: // hower
-                command.data = 3;
-                command_publisher.publish(command);
-                command_publisher.publish(command);
+            case KEYCODE_SPACE: // halt
+                action.data = 3;
                 break;
             case KEYCODE_L: // land
             case KEYCODE_l:
-                command.data = 4;
-                command_publisher.publish(command);
-                command_publisher.publish(command);
+                action.data = 4;
                 break;
             case KEYCODE_Esc: // disarm!
-                command.data = 5;
-                command_publisher.publish(command);
-                command_publisher.publish(command);
+                action.data = 5;
                 break;
             case KEYCODE_R: // reset pose
             case KEYCODE_r:
-                command.data = 6;
-                command_publisher.publish(command);
+                action.data = 6;
                 break;
             case KEYCODE_b: // return-to-home
-                command.data = 7;
-                command_publisher.publish(command);
+                action.data = 7;
                 break;
             case KEYCODE_F1: // remote control!
-                command.data = 101;
-                command_publisher.publish(command);
-                command_publisher.publish(command);
+                action.data = 101;
                 break;
             case KEYCODE_F2: // offboard control!
-                command.data = 102;
-                command_publisher.publish(command);
-                command_publisher.publish(command);
+                action.data = 102;
+                break;
+            case KEYCODE_F4: // reboot!
+                action.data = 110;
+                break;
+            case KEYCODE_F5: // start mission
+                action.data = 11;
+                break;
+            case KEYCODE_F6: // pause mission
+                action.data = 12;
+                break;
+            case KEYCODE_F7: // stop mission
+                action.data = 13;
+                break;
+            case KEYCODE_F12: // calibrate megnetometer!
+                action.data = 111;
                 break;
 
                 /* UAV movements */
             case KEYCODE_a:
-                move_msg.yaw = 1;
+                drone_msg.yaw = 1;
                 break;
             case KEYCODE_d:
-                move_msg.yaw = -1;
+                drone_msg.yaw = -1;
                 break;
             case KEYCODE_w:
-                move_msg.z = 1;
+                drone_msg.z = 1;
                 break;
             case KEYCODE_s:
-                move_msg.z = -1;
+                drone_msg.z = -1;
                 break;
             case KEYCODE_RIGHT: // move right
-                move_msg.y = -1;
+                drone_msg.y = -1;
                 break;
             case KEYCODE_LEFT: // move left
-                move_msg.y = 1;
+                drone_msg.y = 1;
                 break;
             case KEYCODE_UP: // move forward
-                move_msg.x = 1;
+                drone_msg.x = 1;
                 break;
             case KEYCODE_DOWN: // move backward
-                move_msg.x = -1;
+                drone_msg.x = -1;
                 break;
 
                 /* gimbal commadns */
+            case KEYCODE_F9: // calibrate gimbal
+                camera_msg.action = 111;
+                break;
             case KEYCODE_5: // reset to (0, 0)
                 camera_msg.action = 11;
                 break;
@@ -222,17 +235,22 @@ public:
             case KEYCODE_DOT: // stop recording
                 camera_msg.action = 3;
                 break;
+            case KEYCODE_SLASH: // download media
+                camera_msg.action = 4;
+                break;
             }
 
-            move_msg.header.stamp = ros::Time::now();
-            move_msg.header.frame_id = "/body";
-            move_publisher.publish(move_msg);
+            action_publisher.publish(action);
+
+            drone_msg.header.stamp = ros::Time::now();
+            drone_msg.header.frame_id = "body";
+            drone_publisher.publish(drone_msg);
 
             camera_msg.header.stamp = ros::Time::now();
-            camera_msg.header.frame_id = "/body";
+            camera_msg.header.frame_id = "body";
             camera_publisher.publish(camera_msg);
 
-            c = 0;
+            key = 0;
         }
     }
 };
@@ -251,14 +269,23 @@ void *readKey(void *) {
     raw.c_lflag &=~ (ICANON | ECHO);
     tcsetattr(kfd, TCSANOW, &raw);
 
-    while(true)
+    char c = 0;
+    while(true){
+        auto t_start = std::chrono::high_resolution_clock::now();
         read(kfd, &c, 1); // get the next event from the keyboard
+        auto t_end = std::chrono::high_resolution_clock::now();
+        double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_end-t_start).count();
+        if(elapsed_time_ms < 1)
+            key = (key<<8) + c;
+        else
+            key = c;
+    }
 }
 
 int main(int argc, char** argv){
     ros::init(argc, argv, "keyboard_teleop");
 
-    ROS_WARN("Press H for help!!!");
+    ROS_WARN("Press 'H' to show the keyboard mapping");
 
     pthread_t t;
     // Launch a thread
