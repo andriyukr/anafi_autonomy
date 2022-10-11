@@ -3,7 +3,6 @@ project(anafi_autonomy)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  rospy
   std_msgs
   dynamic_reconfigure
   geometry_msgs
@@ -11,12 +10,11 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   tf
   message_generation
+  olympe_bridge
 )
 
 find_package(cmake_modules REQUIRED)
 find_package(Eigen3 REQUIRED)
-
-catkin_python_setup()
 
 add_message_files(
   FILES
@@ -24,24 +22,9 @@ add_message_files(
   PoseCommand.msg
   VelocityCommand.msg
   AttitudeCommand.msg
-  PilotingCommand.msg 
-  MoveByCommand.msg 
-  MoveToCommand.msg 
-  SkyControllerCommand.msg 
-  CameraCommand.msg
-  GimbalCommand.msg
+  AxesCommand.msg
   KeyboardDroneCommand.msg
   KeyboardCameraCommand.msg
-  TargetTrajectory.msg
-)
-
-add_service_files(
-  FILES
-  PilotedPOI.srv
-  FlightPlan.srv
-  FollowMe.srv
-  Location.srv
-  String.srv
 )
 
 generate_messages(
@@ -50,7 +33,6 @@ generate_messages(
 )
 
 generate_dynamic_reconfigure_options(
-  cfg/setAnafi.cfg 
   cfg/setSafeAnafi.cfg
   cfg/setTrajectory.cfg
 )
@@ -59,8 +41,8 @@ catkin_package(
   CATKIN_DEPENDS
   message_runtime 
   roscpp 
-  rospy 
   std_msgs
+  olympe_bridge
 )
 
 include_directories(

@@ -19,21 +19,23 @@
 #include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
 #include <dynamic_reconfigure/server.h>
+
+#include <olympe_bridge/PilotingCommand.h>
+#include <olympe_bridge/MoveToCommand.h>
+#include <olympe_bridge/MoveByCommand.h>
+#include <olympe_bridge/CameraCommand.h>
+#include <olympe_bridge/GimbalCommand.h>
+#include <olympe_bridge/SkyControllerCommand.h>
+#include <olympe_bridge/FlightPlan.h>
+#include <olympe_bridge/FollowMe.h>
+
 #include <anafi_autonomy/setSafeAnafiConfig.h>
 #include <anafi_autonomy/PoseCommand.h>
 #include <anafi_autonomy/VelocityCommand.h>
 #include <anafi_autonomy/AttitudeCommand.h>
 #include <anafi_autonomy/DesiredCommand.h>
-#include <anafi_autonomy/PilotingCommand.h>
-#include <anafi_autonomy/MoveToCommand.h>
-#include <anafi_autonomy/MoveByCommand.h>
-#include <anafi_autonomy/CameraCommand.h>
-#include <anafi_autonomy/GimbalCommand.h>
-#include <anafi_autonomy/SkyControllerCommand.h>
 #include <anafi_autonomy/KeyboardDroneCommand.h>
 #include <anafi_autonomy/KeyboardCameraCommand.h>
-#include <anafi_autonomy/FlightPlan.h>
-#include <anafi_autonomy/FollowMe.h>
 
 #define FILTER_SIZE 		3
 #define COMMAND_NONE 		0
@@ -141,7 +143,7 @@ ServiceClient calibrate_gimbal_client;
 ServiceClient reboot_client;
 
 // Messages
-anafi_autonomy::PilotingCommand rpyg_msg;
+olympe_bridge::PilotingCommand rpyg_msg;
 
 // Services
 std_srvs::Empty empty_srv;

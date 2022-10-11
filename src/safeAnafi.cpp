@@ -145,7 +145,7 @@ void keyboardDroneCallback(const anafi_autonomy::KeyboardDroneCommand& command_m
             (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
 }
 
-void commandSkycontrollerCallback(const anafi_autonomy::SkyControllerCommand& command_msg){
+void commandSkycontrollerCallback(const olympe_bridge::SkyControllerCommand& command_msg){
     // Drone commands
     ros::param::get("anafi/max_vertical_speed", max_vertical_speed);
     ros::param::get("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
@@ -154,7 +154,7 @@ void commandSkycontrollerCallback(const anafi_autonomy::SkyControllerCommand& co
     mode_skycontroller << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE),
             (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
     
-    // Move gimbal
+    // Move
     controller_gimbal_command << 0, (float)command_msg.camera/100;
 
     // Change zoom
@@ -266,11 +266,11 @@ SafeAnafi::SafeAnafi(int argc, char** argv){
     zoom_command_subscriber = node_handle.subscribe("drone/desired_zoom", 1, offboardZoomCallback);
     state_subscriber = node_handle.subscribe("drone/state", 1, stateCallback);
 
-    moveto_publisher = node_handle.advertise<anafi_autonomy::MoveToCommand>("drone/moveto", 1);
-    moveby_publisher = node_handle.advertise<anafi_autonomy::MoveByCommand>("drone/moveby", 1);
-    rpyg_publisher = node_handle.advertise<anafi_autonomy::PilotingCommand>("drone/rpyt", 1);
-    camera_publisher = node_handle.advertise<anafi_autonomy::CameraCommand>("camera/cmd", 1);
-    gimbal_publisher = node_handle.advertise<anafi_autonomy::GimbalCommand>("gimbal/cmd", 1);
+    moveto_publisher = node_handle.advertise<olympe_bridge::MoveToCommand>("drone/moveto", 1);
+    moveby_publisher = node_handle.advertise<olympe_bridge::MoveByCommand>("drone/moveby", 1);
+    rpyg_publisher = node_handle.advertise<olympe_bridge::PilotingCommand>("drone/rpyt", 1);
+    camera_publisher = node_handle.advertise<olympe_bridge::CameraCommand>("camera/cmd", 1);
+    gimbal_publisher = node_handle.advertise<olympe_bridge::GimbalCommand>("gimbal/cmd", 1);
     odometry_publisher = node_handle.advertise<nav_msgs::Odometry>("drone/ground_truth/odometry", 1);
     desired_velocity_publisher = node_handle.advertise<geometry_msgs::TwistStamped>("drone/debug/desired_velocity", 1);
     acceleration_publisher = node_handle.advertise<geometry_msgs::Vector3Stamped>("drone/debug/acceleration", 1);
@@ -282,11 +282,11 @@ SafeAnafi::SafeAnafi(int argc, char** argv){
     arm_client = node_handle.serviceClient<std_srvs::SetBool>("arm");
     land_client = node_handle.serviceClient<std_srvs::Empty>("land");
     rth_client = node_handle.serviceClient<std_srvs::Empty>("rth");
-    flightplan_upload_client = node_handle.serviceClient<anafi_autonomy::FlightPlan>("flightplan_upload");
-    flightplan_start_client = node_handle.serviceClient<anafi_autonomy::FlightPlan>("flightplan_start");
+    flightplan_upload_client = node_handle.serviceClient<olympe_bridge::FlightPlan>("flightplan_upload");
+    flightplan_start_client = node_handle.serviceClient<olympe_bridge::FlightPlan>("flightplan_start");
     flightplan_pause_client = node_handle.serviceClient<std_srvs::Empty>("flightplan_pause");
     flightplan_stop_client = node_handle.serviceClient<std_srvs::Empty>("flightplan_stop");
-    followme_start_client = node_handle.serviceClient<anafi_autonomy::FollowMe>("followme_start");
+    followme_start_client = node_handle.serviceClient<olympe_bridge::FollowMe>("followme_start");
     followme_stop_client = node_handle.serviceClient<std_srvs::Empty>("followme_stop");
     offboard_client = node_handle.serviceClient<std_srvs::SetBool>("offboard");
     calibrate_magnetometer_client = node_handle.serviceClient<std_srvs::Empty>("calibrate_magnetometer");
@@ -318,7 +318,7 @@ SafeAnafi::SafeAnafi(int argc, char** argv){
 // Destructor
 SafeAnafi::~SafeAnafi(){
     ROS_INFO("SafeAnafi is stopping...");
-    anafi_autonomy::PilotingCommand rpyg_msg;
+    olympe_bridge::PilotingCommand rpyg_msg;
     rpyg_publisher.publish(rpyg_msg);
     rpyg_publisher.publish(rpyg_msg);
     land_client.call(empty_srv);
@@ -476,7 +476,7 @@ void stateMachine(){
         case MISSION_START:
             if(mission_type == 0){ // flight plan
                 if(armed){
-                    anafi_autonomy::FlightPlan flightplan_srv;
+                    olympe_bridge::FlightPlan flightplan_srv;
                     flightplan_srv.request.filepath = flightplan_file;
                     flightplan_srv.request.uid = "";
                     flightplan_upload_client.call(flightplan_srv);
@@ -541,14 +541,14 @@ void stateMachine(){
             break;
         case MISSION_START:
             if(mission_type == 0){ // flight plan
-                anafi_autonomy::FlightPlan flightplan_srv;
+                olympe_bridge::FlightPlan flightplan_srv;
                 flightplan_srv.request.filepath = flightplan_file;
                 flightplan_srv.request.uid = "";
                 flightplan_upload_client.call(flightplan_srv);
                 flightplan_start_client.call(flightplan_srv);
             }
             else{ // follow me
-                anafi_autonomy::FollowMe followme_srv;
+                olympe_bridge::FollowMe followme_srv;
                 followme_srv.request.mode = followme_mode;
                 followme_srv.request.horizontal = 2;
                 followme_srv.request.vertical = 10;
@@ -630,7 +630,7 @@ void SafeAnafi::run(){
         gimbal_command <<   (controller_gimbal_command(0) != 0 ? controller_gimbal_command(0) : (keyboard_gimbal_command(0) != 0 ? keyboard_gimbal_command(0) : offboard_gimbal_command(0))),
                             (controller_gimbal_command(1) != 0 ? controller_gimbal_command(1) : (keyboard_gimbal_command(1) != 0 ? keyboard_gimbal_command(1) : offboard_gimbal_command(1)));
 
-        anafi_autonomy::GimbalCommand gimbal_msg;
+        olympe_bridge::GimbalCommand gimbal_msg;
         gimbal_msg.header.stamp = ros::Time::now();
         gimbal_msg.header.frame_id = "body";
         gimbal_msg.mode = 1;
@@ -649,7 +649,7 @@ void SafeAnafi::run(){
         // Zoom
         zoom_command = (controller_zoom_command != 0 ? controller_zoom_command : (keyboard_zoom_command != 0 ? keyboard_zoom_command : offboard_zoom_command));
 
-        anafi_autonomy::CameraCommand camera_msg;
+        olympe_bridge::CameraCommand camera_msg;
         camera_msg.header.stamp = ros::Time::now();
         camera_msg.header.frame_id = "gimbal";
         camera_msg.mode = 1;

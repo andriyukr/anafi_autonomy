@@ -1,4 +1,4 @@
- #!/bin/bash
+#!/bin/bash
 # ANAFI interface configuration script: configure one ANAFI interface
 
 # All ANAFIs have a default IP address set to 192.168.42.1 . Hence by default,

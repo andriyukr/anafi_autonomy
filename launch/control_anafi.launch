@@ -8,7 +8,7 @@
 
 	<env name="ROSCONSOLE_FORMAT" value="[${severity}] [${time}] [${node}]: ${message}"/>
 	
-	<include file="$(find anafi_autonomy)/launch/anafi.launch">
+	<include file="$(find olympe_bridge)/launch/anafi.launch">
 		<arg name="name" value="$(arg name)"/>
 		<arg name="model" value="$(arg model)"/> 
 		<arg name="ip" value="$(arg ip)"/>
