@@ -25,7 +25,7 @@
 #include <olympe_bridge/MoveByCommand.h>
 #include <olympe_bridge/CameraCommand.h>
 #include <olympe_bridge/GimbalCommand.h>
-#include <olympe_bridge/SkyControllerCommand.h>
+#include <olympe_bridge/SkycontrollerCommand.h>
 #include <olympe_bridge/FlightPlan.h>
 #include <olympe_bridge/FollowMe.h>
 

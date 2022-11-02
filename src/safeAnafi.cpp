@@ -145,7 +145,7 @@ void keyboardDroneCallback(const anafi_autonomy::KeyboardDroneCommand& command_m
             (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
 }
 
-void commandSkycontrollerCallback(const olympe_bridge::SkyControllerCommand& command_msg){
+void commandSkycontrollerCallback(const olympe_bridge::SkycontrollerCommand& command_msg){
     // Drone commands
     ros::param::get("anafi/max_vertical_speed", max_vertical_speed);
     ros::param::get("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
@@ -276,28 +276,28 @@ SafeAnafi::SafeAnafi(int argc, char** argv){
     acceleration_publisher = node_handle.advertise<geometry_msgs::Vector3Stamped>("drone/debug/acceleration", 1);
     mode_publisher = node_handle.advertise<geometry_msgs::Vector3Stamped>("drone/debug/mode", 1);
 
-    emergency_client = node_handle.serviceClient<std_srvs::Empty>("emergency");
-    halt_client = node_handle.serviceClient<std_srvs::Empty>("halt");
-    takeoff_client = node_handle.serviceClient<std_srvs::Empty>("takeoff");
-    arm_client = node_handle.serviceClient<std_srvs::SetBool>("arm");
-    land_client = node_handle.serviceClient<std_srvs::Empty>("land");
-    rth_client = node_handle.serviceClient<std_srvs::Empty>("rth");
-    flightplan_upload_client = node_handle.serviceClient<olympe_bridge::FlightPlan>("flightplan_upload");
-    flightplan_start_client = node_handle.serviceClient<olympe_bridge::FlightPlan>("flightplan_start");
-    flightplan_pause_client = node_handle.serviceClient<std_srvs::Empty>("flightplan_pause");
-    flightplan_stop_client = node_handle.serviceClient<std_srvs::Empty>("flightplan_stop");
-    followme_start_client = node_handle.serviceClient<olympe_bridge::FollowMe>("followme_start");
-    followme_stop_client = node_handle.serviceClient<std_srvs::Empty>("followme_stop");
-    offboard_client = node_handle.serviceClient<std_srvs::SetBool>("offboard");
-    calibrate_magnetometer_client = node_handle.serviceClient<std_srvs::Empty>("calibrate_magnetometer");
-    calibrate_gimbal_client = node_handle.serviceClient<std_srvs::Empty>("calibrate_gimbal");
-    take_photo_client = node_handle.serviceClient<std_srvs::Empty>("take_photo");
-    start_recording_client = node_handle.serviceClient<std_srvs::Empty>("start_recording");
-    stop_recording_client = node_handle.serviceClient<std_srvs::Empty>("stop_recording");
-    reset_zoom_client = node_handle.serviceClient<std_srvs::Empty>("reset_zoom");
-    reset_gimbal_client = node_handle.serviceClient<std_srvs::Empty>("reset_gimbal");
-    download_media_client = node_handle.serviceClient<std_srvs::Empty>("download_media");
-    reboot_client = node_handle.serviceClient<std_srvs::Empty>("reboot");
+    emergency_client = node_handle.serviceClient<std_srvs::Empty>("drone/emergency");
+    halt_client = node_handle.serviceClient<std_srvs::Empty>("drone/halt");
+    takeoff_client = node_handle.serviceClient<std_srvs::Empty>("drone/takeoff");
+    arm_client = node_handle.serviceClient<std_srvs::SetBool>("drone/arm");
+    land_client = node_handle.serviceClient<std_srvs::Empty>("drone/land");
+    rth_client = node_handle.serviceClient<std_srvs::Empty>("drone/rth");
+    flightplan_upload_client = node_handle.serviceClient<olympe_bridge::FlightPlan>("flightplan/upload");
+    flightplan_start_client = node_handle.serviceClient<olympe_bridge::FlightPlan>("flightplan/start");
+    flightplan_pause_client = node_handle.serviceClient<std_srvs::Empty>("flightplan/pause");
+    flightplan_stop_client = node_handle.serviceClient<std_srvs::Empty>("flightplan/stop");
+    followme_start_client = node_handle.serviceClient<olympe_bridge::FollowMe>("followme/start");
+    followme_stop_client = node_handle.serviceClient<std_srvs::Empty>("followme/stop");
+    offboard_client = node_handle.serviceClient<std_srvs::SetBool>("drone/offboard");
+    calibrate_magnetometer_client = node_handle.serviceClient<std_srvs::Empty>("magnetometer/calibrate");
+    calibrate_gimbal_client = node_handle.serviceClient<std_srvs::Empty>("gimbal/calibrate");
+    take_photo_client = node_handle.serviceClient<std_srvs::Empty>("photo/photo");
+    start_recording_client = node_handle.serviceClient<std_srvs::Empty>("recording/start");
+    stop_recording_client = node_handle.serviceClient<std_srvs::Empty>("recording/stop");
+    reset_zoom_client = node_handle.serviceClient<std_srvs::Empty>("zoom/reset");
+    reset_gimbal_client = node_handle.serviceClient<std_srvs::Empty>("gimbal/reset");
+    download_media_client = node_handle.serviceClient<std_srvs::Empty>("media/download");
+    reboot_client = node_handle.serviceClient<std_srvs::Empty>("drone/reboot");
 
     ros::param::get("safe_anafi/bounds/min_x", bounds(0,0));
     ros::param::get("safe_anafi/bounds/min_y", bounds(0,1));
