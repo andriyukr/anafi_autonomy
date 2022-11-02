@@ -1,5 +1,5 @@
-# ROS Package for Parrot Anafi Drones Navigation
-This ROS package contains interface to control drones from Parrot Anafi family (4K, Thermal, USA, AI, Sphinx).
+# ROS2 Package for Parrot Anafi Drones Navigation
+This ROS2 package contains interface to control drones from Parrot Anafi family (4K, Thermal, USA, AI, Sphinx).
 
 ## Overview
 
@@ -13,32 +13,44 @@ This is research code, expect that it changes often and any fitness for a partic
 
 ## Installation
 
-This package has been tested in **ROS Melodic**/**Ubuntu 18.04** and **ROS Noetic**/**Ubuntu 20.04**.
+This package has been tested with **python3** in **ROS2 Humble**/**Ubuntu 22.04**.
 
 ### Dependencies
 
-- [olympe_bridge](https://github.com/andriyukr/olympe_bridge) - ROS bridge for Parrot Olympe SDK:
- 
-      cd ~/catkin_ws/src
-      git clone https://github.com/andriyukr/olympe_bridge.git
-      sudo chmod -R 777 olympe_bridge/
-      catkin build
+- [olympe_bridge](https://github.com/andriyukr/olympe_bridge) - ROS bridge for Parrot Olympe SDK
+      
+- (optinal) [xterm](https://invisible-island.net/xterm/xterm.html) - terminal emulator:
+
+    sudo apt-get install xterm
     
 ### Clone
 
-To build from source, clone the latest version from this repository into your catkin workspace and compile the package using:
+To build from source, clone the latest version from this repository into your ROS2 workspace and build the package using:
 
-      cd ~/catkin_ws/src
-      git clone https://github.com/andriyukr/anafi_autonomy.git
-      sudo chmod -R 777 anafi_autonomy/
-      cd ..  
-      catkin build
-
-If your workspace was previously built with `catkin_make`, then build the package using `catkin_make` instead of `catkin build`.
+    cd ~/dev_ws/src
+    git clone -b ros2 https://github.com/andriyukr/anafi_autonomy.git
+    sudo chmod -R 777 anafi_autonomy/
+    cd ..
+    colcon build
 
 ## Usage
 
-To connect to the drone, in the terminal run:
+### Method 1 (without xterm):
 
-      roslaunch anafi_autonomy control_anafi.launch
+To control to the drone, in the terminal 1, run:
 
+    ros2 launch anafi_autonomy safe_anafi_launch.py
+
+and, in terminal 2, run:
+
+    ros2 run anafi_autonomy teleop_key --ros-args -r __ns:=/anafi
+    
+The commands can be keyed in terminal 2.
+    
+### Method 2 (with xterm):
+
+To control to the drone, in the terminal, run:
+
+    ros2 launch anafi_autonomy control_anafi_launch.py
+    
+A new window will pop-up where commands can be keyed in. 

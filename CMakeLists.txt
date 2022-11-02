@@ -1,64 +1,85 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.5)
+
 project(anafi_autonomy)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  std_msgs
-  dynamic_reconfigure
-  geometry_msgs
-  roslib
-  sensor_msgs
-  tf
-  message_generation
-  olympe_bridge
-)
+if(NOT CMAKE_CXX_STANDARD)
+	set(CMAKE_CXX_STANDARD 14)
+endif()
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-find_package(cmake_modules REQUIRED)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(olympe_bridge_interfaces REQUIRED)
 
-add_message_files(
-  FILES
-  DesiredCommand.msg
-  PoseCommand.msg
-  VelocityCommand.msg
-  AttitudeCommand.msg
-  AxesCommand.msg
-  KeyboardDroneCommand.msg
-  KeyboardCameraCommand.msg
+set(msg_files
+	"msg/DesiredCommand.msg"
+	"msg/PoseCommand.msg"
+	"msg/VelocityCommand.msg"
+	"msg/AttitudeCommand.msg"
+	"msg/AxesCommand.msg"
+	"msg/KeyboardDroneCommand.msg"
+	"msg/KeyboardCameraCommand.msg"
 )
 
-generate_messages(
-  DEPENDENCIES 
-  std_msgs
+rosidl_generate_interfaces(${PROJECT_NAME}
+	${msg_files}
+	DEPENDENCIES builtin_interfaces std_msgs geometry_msgs
 )
 
-generate_dynamic_reconfigure_options(
-  cfg/setSafeAnafi.cfg
-  cfg/setTrajectory.cfg
-)
+ament_export_dependencies(rosidl_default_runtime)
 
-catkin_package(
-  CATKIN_DEPENDS
-  message_runtime 
-  roscpp 
-  std_msgs
-  olympe_bridge
-)
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 include_directories(
-  include 
-  ${catkin_INCLUDE_DIRS} 
-  ${EIGEN3_INCLUDE_DIRS}
+	include 
+	${EIGEN3_INCLUDE_DIRS}
 )
 
 add_executable(safe_anafi src/safeAnafi.cpp)
-target_link_libraries(safe_anafi ${catkin_LIBRARIES})
-add_dependencies(safe_anafi ${PROJECT_NAME}_gencfg)
+ament_target_dependencies(safe_anafi 
+	rclcpp 
+	std_msgs
+	geometry_msgs
+	sensor_msgs
+	nav_msgs
+	std_srvs
+	tf2
+	olympe_bridge_interfaces)
+target_link_libraries(safe_anafi "${cpp_typesupport_target}")
 
 add_executable(teleop_key src/teleopKey.cpp)
-target_link_libraries(teleop_key ${catkin_LIBRARIES})
-add_dependencies(teleop_key ${PROJECT_NAME}_gencfg)
+ament_target_dependencies(teleop_key 
+	rclcpp 
+	std_msgs
+	geometry_msgs)
+target_link_libraries(teleop_key "${cpp_typesupport_target}")
 
 add_executable(trajectory src/trajectory.cpp)
-target_link_libraries(trajectory ${catkin_LIBRARIES})
-add_dependencies(trajectory ${PROJECT_NAME}_gencfg)
+ament_target_dependencies(trajectory 
+	rclcpp)
+target_link_libraries(trajectory "${cpp_typesupport_target}")
+
+install(TARGETS
+	safe_anafi
+	teleop_key
+	trajectory
+	DESTINATION lib/${PROJECT_NAME})
+	
+# Install launch files.
+install(DIRECTORY
+	launch
+	DESTINATION share/${PROJECT_NAME}/
+)
+	
+ament_package()
