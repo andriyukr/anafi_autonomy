@@ -23,6 +23,9 @@ class Trajectory : public rclcpp::Node{
 		// Timer
 		rclcpp::TimerBase::SharedPtr timer;
 		
+		// Callback
+		OnSetParametersCallbackHandle::SharedPtr callback;
+		
 		// Publishers
 		rclcpp::Publisher<anafi_autonomy::msg::PoseCommand>::SharedPtr pose_publisher;
 		rclcpp::Publisher<anafi_autonomy::msg::VelocityCommand>::SharedPtr velocity_publisher;
@@ -42,4 +45,5 @@ class Trajectory : public rclcpp::Node{
 		
 		// Callback
 		void timer_callback();
+		rcl_interfaces::msg::SetParametersResult parameterCallback(const std::vector<rclcpp::Parameter> &parameters);
 };

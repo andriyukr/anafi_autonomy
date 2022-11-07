@@ -8,48 +8,15 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 def generate_launch_description():
-	anafi = IncludeLaunchDescription(
+	safe_anafi = IncludeLaunchDescription(
 		PythonLaunchDescriptionSource([
-			os.path.join(get_package_share_directory('olympe_bridge_nodes')), 
-			'/anafi_launch.py'
-		]),
-		launch_arguments={
-			'model': '',
-			'ip': '192.168.53.1',
-			'skycontroller': 'True',
-			'drone_serial': '',
-			'wifi_key': ''
-		}.items()
+			os.path.join(get_package_share_directory('anafi_autonomy')), 
+			'/launch/safe_anafi_launch.py'
+		])
 	)
 
 	return LaunchDescription([
-		anafi,
-		Node(
-			package='anafi_autonomy',
-			namespace='anafi',
-			executable='safe_anafi',
-			name='safe_anafi',
-			output="screen",
-			#emulate_tty=True,
-			arguments=['--ros-args', '--log-level', 'INFO'],
-			parameters=[
-				{'safe_anafi/bounds/min_x': -5.0},
-				{'safe_anafi/bounds/min_x': 5.0},
-				{'safe_anafi/bounds/min_x': -5.0}, 
-				{'safe_anafi/bounds/min_x': 5.0},
-				{'safe_anafi/bounds/min_x': 0.2}, 
-				{'safe_anafi/bounds/min_x': 2.0} 
-			]
-		),
-		Node(
-			package='anafi_autonomy',
-			namespace='anafi',
-			executable='trajectory',
-			name='trajectory',
-			output="screen",
-			#emulate_tty=True,
-			arguments=['--ros-args', '--log-level', 'INFO'],
-		),
+		safe_anafi,
 		Node(
 			package='anafi_autonomy',
 			namespace='anafi',
@@ -57,13 +24,7 @@ def generate_launch_description():
 			name='teleop_key',
 			output="screen",
 			emulate_tty=True,
+			prefix='xterm -e',
 			arguments=['--ros-args', '--log-level', 'INFO'],
-		),
-		Node(
-			package='rqt_image_view',
-			namespace='anafi',
-			executable='rqt_image_view',
-			name='rqt_image_view',
-			arguments=['/anafi/camera/image'],
 		),
 	])

@@ -20,11 +20,85 @@
 Trajectory::Trajectory() : Node("trajectory"){
 	RCLCPP_INFO(this->get_logger(), "Trajectory is running...");
 
+    // Publishers
 	pose_publisher = this->create_publisher<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS());
 	velocity_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/reference_velocity", rclcpp::SystemDefaultsQoS());
 	axes_publisher = this->create_publisher<anafi_autonomy::msg::AxesCommand>("drone/command_offboard", rclcpp::SystemDefaultsQoS());
-	
+
+	// Parameters
+    callback = this->add_on_set_parameters_callback(std::bind(&Trajectory::parameterCallback, this, std::placeholders::_1));
+
+    rcl_interfaces::msg::ParameterDescriptor parameter_descriptor;
+    rcl_interfaces::msg::IntegerRange integer_range;
+    rcl_interfaces::msg::FloatingPointRange floating_point_range;
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+    parameter_descriptor.description = "Trajectory type: 0 = no trajectory, 1 = hover at (0, 0, 1, yaw_d), 2 = defined by user with (x_d, y_d, z_d, yaw_d)";
+    integer_range = rcl_interfaces::msg::IntegerRange();
+    integer_range.from_value = 0;
+    integer_range.to_value = 2;
+    integer_range.step = 1;
+    parameter_descriptor.integer_range.push_back(integer_range);
+    this->declare_parameter("trajectory_type", 0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+    parameter_descriptor.description = "Desired x position";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange();
+    floating_point_range.from_value = -10.0;
+    floating_point_range.to_value = 10.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("desired/x", 0.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+    parameter_descriptor.description = "Desired y position";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange();
+    floating_point_range.from_value = -10.0;
+    floating_point_range.to_value = 10.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("desired/y", 0.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+    parameter_descriptor.description = "Desired z position";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange();
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 2.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("desired/z", 1.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+    parameter_descriptor.description = "Desired yaw orientation";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange();
+    floating_point_range.from_value = -180.0;
+    floating_point_range.to_value = 180.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("desired/yaw", 0.0, parameter_descriptor);
+
+	// Timer
 	timer = this->create_wall_timer(10ms, std::bind(&Trajectory::timer_callback, this));
+}
+
+rcl_interfaces::msg::SetParametersResult Trajectory::parameterCallback(const std::vector<rclcpp::Parameter> &parameters){
+    auto result = rcl_interfaces::msg::SetParametersResult();
+    result.successful = true;
+
+    for(auto &parameter:parameters){
+        if(parameter.get_name() == "trajectory_type")
+            trajectory_type = parameter.as_int();
+        if(parameter.get_name() == "desired/x")
+            pose_d(0) = parameter.as_double();
+        if(parameter.get_name() == "desired/y")
+            pose_d(1) = parameter.as_double();
+        if(parameter.get_name() == "desired/z")
+            pose_d(2) = parameter.as_double();
+        if(parameter.get_name() == "desired/yaw")
+            pose_d(3) = parameter.as_double();
+    }
+
+    return result;
 }
 
 void Trajectory::timer_callback(){

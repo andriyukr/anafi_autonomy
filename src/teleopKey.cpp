@@ -74,11 +74,27 @@ class Teleop : public rclcpp::Node{
 		// Constructor
 		Teleop() : Node("keyboard_teleop"){
 			RCLCPP_INFO(this->get_logger(), "Teleop is running...");
-			RCLCPP_WARN(this->get_logger(), "Press 'H' to show the keyboard mapping");
+			
+			cout <<	"Press: \n"
+				"Insert \t - arm \n"
+				"t \t - take-off \n"
+				"l \t - land \n"
+				"Esc \t - cut motors \n"
+				"UP \t - move forward \n"
+				"DOWN \t - move backward \n"
+				"LEFT \t - move left \n"
+				"RIGHT \t - move right \n"
+				"w \t - move up \n"
+				"s \t - move down \n"
+				"a \t - yaw clockwise \n"
+				"d \t - yaw counterclockwise \n"
+				"b \t - return to home \n"
+				"SPACE \t - halt \n"
+				"r \t - reset pose \n";
 		
-			action_publisher = this->create_publisher<std_msgs::msg::Int8>("anafi/keyboard/action", rclcpp::SystemDefaultsQoS());
-			drone_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardDroneCommand>("anafi/keyboard/drone_command", rclcpp::SystemDefaultsQoS());
-			camera_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardCameraCommand>("anafi/keyboard/camera_command", rclcpp::SystemDefaultsQoS());
+			action_publisher = this->create_publisher<std_msgs::msg::Int8>("keyboard/action", rclcpp::SystemDefaultsQoS());
+			drone_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardDroneCommand>("keyboard/drone_command", rclcpp::SystemDefaultsQoS());
+			camera_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardCameraCommand>("keyboard/camera_command", rclcpp::SystemDefaultsQoS());
 						
 			timer = this->create_wall_timer(70ms, std::bind(&Teleop::timer_callback, this));
 		}
@@ -105,26 +121,6 @@ class Teleop : public rclcpp::Node{
 				RCLCPP_DEBUG_STREAM(this->get_logger(), "(loop) key = " << key);
 
 			switch(key){
-			case KEYCODE_H: // help
-			case KEYCODE_h:
-				cout << "Press: \n";
-				cout << "Insert \t - arm \n";
-				cout << "t \t - take-off \n";
-				cout << "l \t - land \n";
-
-				cout << "Esc \t - cut motors \n";
-				cout << "UP \t - move forward \n";
-				cout << "DOWN \t - move backward \n";
-				cout << "LEFT \t - move left \n";
-				cout << "RIGHT \t - move right \n";
-				cout << "w \t - move up \n";
-				cout << "s \t - move down \n";
-				cout << "a \t - yaw clockwise \n";
-				cout << "d \t - yaw counterclockwise \n";
-				cout << "b \t - return to home \n";
-				cout << "SPACE \t - halt \n";
-				cout << "r \t - reset pose \n";
-				break;
 
 			/* UAV commands */
 			case KEYCODE_Insert: // arm

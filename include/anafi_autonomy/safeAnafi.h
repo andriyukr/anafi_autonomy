@@ -21,6 +21,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/transform_datatypes.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 #include <olympe_bridge_interfaces/msg/piloting_command.hpp>
 #include <olympe_bridge_interfaces/msg/move_to_command.hpp>
@@ -94,9 +95,6 @@ class SafeAnafi : public rclcpp::Node{
 		SafeAnafi();
 
 	private:			
-		// Timer
-		rclcpp::TimerBase::SharedPtr timer;
-	
 		// Subsribers
 		rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr action_subscriber;
 		rclcpp::Subscription<olympe_bridge_interfaces::msg::SkycontrollerCommand>::SharedPtr command_skycontroller_subscriber;
@@ -156,6 +154,16 @@ class SafeAnafi : public rclcpp::Node{
 		std::shared_ptr<std_srvs::srv::Trigger_Request_<std::allocator<void>>> trigger_request;
 		std::shared_ptr<std_srvs::srv::SetBool_Request_<std::allocator<void>>> true_request;
 		std::shared_ptr<std_srvs::srv::SetBool_Request_<std::allocator<void>>> false_request;
+		
+		// Parameter client
+		rclcpp::AsyncParametersClient::SharedPtr parameters_client;
+		rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr param_events_subscriber;
+		
+		// Timers
+		rclcpp::TimerBase::SharedPtr timer;
+		
+		// Callback
+		OnSetParametersCallbackHandle::SharedPtr callback;
 
 		// Flags
 		bool armed = false;
@@ -177,9 +185,10 @@ class SafeAnafi : public rclcpp::Node{
 		Vector3d position_error = Vector3d::Zero();
 		Vector3d position_error_i = Vector3d::Zero();
 		Vector3d position_error_d = Vector3d::Zero();
-		Matrix<double, 2, 3> bounds {
-			{0, 0, 0}, 	// {min_x, min_y, min_z}
-			{0, 0, 0} 	// {max_x, max_y, max_z}
+		Matrix<double, 3, 2> bounds {
+			{0, 0}, 	// {x_min, x_max}
+			{0, 0}, 	// {y_min, y_max}
+			{0, 0} 		// {z_min, z_max}
 		};
 
 		// Attitude
@@ -249,6 +258,8 @@ class SafeAnafi : public rclcpp::Node{
 		
 		// Callbacks
 		void timer_callback();
+		void parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
+		rcl_interfaces::msg::SetParametersResult parameter_callback(const std::vector<rclcpp::Parameter> &parameters);
 		void actionCallback(const std_msgs::msg::Int8& action_msg);
 		void skycontrollerCallback(const olympe_bridge_interfaces::msg::SkycontrollerCommand& command_msg);
 		void keyboardCallback(const anafi_autonomy::msg::KeyboardDroneCommand& command_msg);
@@ -266,7 +277,8 @@ class SafeAnafi : public rclcpp::Node{
 		void optitrackCallback(const geometry_msgs::msg::PoseStamped& optitrack_msg);
 
 		// Functions
-		void stateMachine();	
+		void stateMachine();
+		void parameter_assign(rcl_interfaces::msg::Parameter &parameter);
 		States resolveState(std::string input);
 		void controllers();
 		geometry_msgs::msg::Twist filter_mean_velocities(geometry_msgs::msg::Twist v);

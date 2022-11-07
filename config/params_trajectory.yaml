@@ -1,0 +1,9 @@
+anafi:
+  trajectory:
+    ros__parameters:
+      trajectory: 0  # Trajectory type: 0 = no trajectory, 1 = hover at (0, 0, 1, yaw_d), 2 = defined by user with (x_d, y_d, z_d, yaw_d)
+      desired:  # Desired pose
+        x: 0.0  # Desired x position
+        y: 0.0  # Desired y position
+        z: 1.0  # Desired z position
+        yaw: 0.0  # Desired yaw orientation

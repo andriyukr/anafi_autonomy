@@ -17,38 +17,22 @@
 
 #include "anafi_autonomy/safeAnafi.h"
 
-// ********************** Callbacks **********************
-/*void dynamicReconfigureCallback(anafi_autonomy::setSafeAnafiConfig &config, uint32_t level){
-	if(level == -1 || level == 1){
-		hand_launch = config.hand_launch;
-		takingoff_control = config.takingoff_control;
-		landing_control = config.landing_control;
-		fixed_frame = config.fixed_frame;
-		world_frame = config.world_frame;
-		if(!world_frame)
-			initial_yaw = yaw;
-	}
-	if(level == -1 || level == 2){ // mission
-		mission_type = config.mission_type;
-		flightplan_file = config.flightplan_file;
-		followme_mode = config.followme_mode;
-	}
-	if(level == -1 || level == 3){ // gains
-		k_p_position = config.k_p_position;
-		k_i_position = config.k_i_position;
-		k_d_position = config.k_d_position;
-		max_i_position = config.max_i_position;
-		k_p_velocity = config.k_p_velocity;
-		k_d_velocity = config.k_d_velocity;
-		k_p_yaw = config.k_p_yaw;
-	}
-}*/
-
-
 // Constructor
 SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	RCLCPP_INFO(this->get_logger(), "SafeAnafi is running...");
 
+	// Publishers
+	rpyg_publisher = this->create_publisher<olympe_bridge_interfaces::msg::PilotingCommand>("drone/rpyt", rclcpp::SystemDefaultsQoS());
+	moveto_publisher = this->create_publisher<olympe_bridge_interfaces::msg::MoveToCommand>("drone/moveto", rclcpp::SystemDefaultsQoS());
+	moveby_publisher = this->create_publisher<olympe_bridge_interfaces::msg::MoveByCommand>("drone/moveby", rclcpp::SystemDefaultsQoS());
+	camera_publisher = this->create_publisher<olympe_bridge_interfaces::msg::CameraCommand>("camera/cmd", rclcpp::SystemDefaultsQoS());
+	gimbal_publisher = this->create_publisher<olympe_bridge_interfaces::msg::GimbalCommand>("gimbal/cmd", rclcpp::SystemDefaultsQoS());
+	odometry_publisher = this->create_publisher<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS());
+	desired_velocity_publisher = this->create_publisher<geometry_msgs::msg::TwistStamped>("drone/debug/desired_velocity", rclcpp::SystemDefaultsQoS());
+	acceleration_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/acceleration", rclcpp::SystemDefaultsQoS());
+	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
+
+    // Subscribers
 	action_subscriber = this->create_subscription<std_msgs::msg::Int8>("keyboard/action", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::actionCallback, this, _1));
 	command_skycontroller_subscriber = this->create_subscription<olympe_bridge_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::skycontrollerCallback, this, _1));
 	command_keyboard_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardDroneCommand>("keyboard/drone_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::keyboardCallback, this, _1));
@@ -64,77 +48,367 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	gps_subscriber = this->create_subscription<sensor_msgs::msg::NavSatFix>("drone/gps/location", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::gpsCallback, this, _1));
 	odometry_subscriber = this->create_subscription<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::odometryCallback, this, _1));
 	optitrack_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("/optitrack/odometry", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::optitrackCallback, this, _1));
-	
-	rpyg_publisher = this->create_publisher<olympe_bridge_interfaces::msg::PilotingCommand>("drone/rpyt", rclcpp::SystemDefaultsQoS());
-	moveto_publisher = this->create_publisher<olympe_bridge_interfaces::msg::MoveToCommand>("drone/moveto", rclcpp::SystemDefaultsQoS());
-	moveby_publisher = this->create_publisher<olympe_bridge_interfaces::msg::MoveByCommand>("drone/moveby", rclcpp::SystemDefaultsQoS());
-	camera_publisher = this->create_publisher<olympe_bridge_interfaces::msg::CameraCommand>("camera/cmd", rclcpp::SystemDefaultsQoS());
-	gimbal_publisher = this->create_publisher<olympe_bridge_interfaces::msg::GimbalCommand>("gimbal/cmd", rclcpp::SystemDefaultsQoS());
-	odometry_publisher = this->create_publisher<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS());
-	desired_velocity_publisher = this->create_publisher<geometry_msgs::msg::TwistStamped>("drone/debug/desired_velocity", rclcpp::SystemDefaultsQoS());
-	acceleration_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/acceleration", rclcpp::SystemDefaultsQoS());
-	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
 
+    // Services
+	arm_client = this->create_client<std_srvs::srv::SetBool>("drone/arm");
+	takeoff_client = this->create_client<std_srvs::srv::Trigger>("drone/takeoff");
+	land_client = this->create_client<std_srvs::srv::Trigger>("drone/land");
 	emergency_client = this->create_client<std_srvs::srv::Trigger>("drone/emergency");
 	halt_client = this->create_client<std_srvs::srv::Trigger>("drone/halt");
-	takeoff_client = this->create_client<std_srvs::srv::Trigger>("drone/takeoff");
-	arm_client = this->create_client<std_srvs::srv::SetBool>("drone/arm");
-	land_client = this->create_client<std_srvs::srv::Trigger>("drone/land");
 	rth_client = this->create_client<std_srvs::srv::Trigger>("drone/rth");
-	flightplan_upload_client = this->create_client<olympe_bridge_interfaces::srv::FlightPlan>("drone/flightplan_upload");
-	flightplan_start_client = this->create_client<olympe_bridge_interfaces::srv::FlightPlan>("drone/flightplan_start");
-	flightplan_pause_client = this->create_client<std_srvs::srv::Trigger>("drone/flightplan_pause");
-	flightplan_stop_client = this->create_client<std_srvs::srv::Trigger>("drone/flightplan_stop");
-	followme_start_client = this->create_client<olympe_bridge_interfaces::srv::FollowMe>("drone/followme_start");
-	followme_stop_client = this->create_client<std_srvs::srv::Trigger>("drone/followme_stop");
-	offboard_client = this->create_client<std_srvs::srv::SetBool>("skycontroller/offboard");
-	calibrate_magnetometer_client = this->create_client<std_srvs::srv::Trigger>("drone/calibrate");
-	calibrate_gimbal_client = this->create_client<std_srvs::srv::Trigger>("gimbal/calibrate");
-	take_photo_client = this->create_client<std_srvs::srv::Trigger>("camera/take_photo");
-	start_recording_client = this->create_client<std_srvs::srv::Trigger>("camera/start_recording");
-	stop_recording_client = this->create_client<std_srvs::srv::Trigger>("camera/stop_recording");
-	reset_zoom_client = this->create_client<std_srvs::srv::Trigger>("camera/reset");
-	reset_gimbal_client = this->create_client<std_srvs::srv::Trigger>("gimbal/reset");
-	download_media_client = this->create_client<std_srvs::srv::Trigger>("drone/download_media");
 	reboot_client = this->create_client<std_srvs::srv::Trigger>("drone/reboot");
-	
+	calibrate_magnetometer_client = this->create_client<std_srvs::srv::Trigger>("drone/calibrate");
+	offboard_client = this->create_client<std_srvs::srv::SetBool>("skycontroller/offboard");
+	flightplan_upload_client = this->create_client<olympe_bridge_interfaces::srv::FlightPlan>("flightplan/upload");
+	flightplan_start_client = this->create_client<olympe_bridge_interfaces::srv::FlightPlan>("flightplan/start");
+	flightplan_pause_client = this->create_client<std_srvs::srv::Trigger>("flightplan/pause");
+	flightplan_stop_client = this->create_client<std_srvs::srv::Trigger>("flightplan/stop");
+	followme_start_client = this->create_client<olympe_bridge_interfaces::srv::FollowMe>("followme/start");
+	followme_stop_client = this->create_client<std_srvs::srv::Trigger>("followme/stop");
+	reset_gimbal_client = this->create_client<std_srvs::srv::Trigger>("gimbal/reset");
+	calibrate_gimbal_client = this->create_client<std_srvs::srv::Trigger>("gimbal/calibrate");
+	reset_zoom_client = this->create_client<std_srvs::srv::Trigger>("camera/reset");
+	take_photo_client = this->create_client<std_srvs::srv::Trigger>("camera/photo/take");
+	start_recording_client = this->create_client<std_srvs::srv::Trigger>("camera/recording/start");
+	stop_recording_client = this->create_client<std_srvs::srv::Trigger>("camera/recording/stop");
+	download_media_client = this->create_client<std_srvs::srv::Trigger>("storage/download");
+
+	// Static requests
 	trigger_request = std::make_shared<std_srvs::srv::Trigger::Request>();
 	false_request = std::make_shared<std_srvs::srv::SetBool::Request>();
 	true_request = std::make_shared<std_srvs::srv::SetBool::Request>();
-	
 	false_request->data = false;
 	true_request->data = true;
 
-	this->declare_parameter<double>("safe_anafi/bounds/min_x", 0);
-	this->declare_parameter<double>("safe_anafi/bounds/min_y", 0);
-	this->declare_parameter<double>("safe_anafi/bounds/min_z", 0);
-	this->declare_parameter<double>("safe_anafi/bounds/max_x", 0);
-	this->declare_parameter<double>("safe_anafi/bounds/max_y", 0);
-	this->declare_parameter<double>("safe_anafi/bounds/max_z", 0);
-	/*this->declare_parameter<double>("anafi/max_vertical_speed", 0);
-	this->declare_parameter<double>("anafi/max_yaw_rotation_speed", 0);
-	this->declare_parameter<double>("anafi/max_horizontal_speed", 0);
-	this->declare_parameter<double>("anafi/max_vertical_speed", 0);
-	this->declare_parameter<double>("anafi/max_yaw_rotation_speed", 0);
-	this->declare_parameter<double>("anafi/max_horizontal_speed", 0);
-	this->declare_parameter<double>("anafi/max_horizontal_speed", 0);
-	this->declare_parameter<double>("anafi/max_tilt", 0);
-	this->declare_parameter<double>("anafi/max_vertical_speed", 0);
-	this->declare_parameter<double>("anafi/max_yaw_rotation_speed", 0);*/
-	
-	this->get_parameter("safe_anafi/bounds/min_x", bounds(0,0));
-	this->get_parameter("safe_anafi/bounds/min_y", bounds(0,1));
-	this->get_parameter("safe_anafi/bounds/min_z", bounds(0,2));
-	this->get_parameter("safe_anafi/bounds/max_x", bounds(1,0));
-	this->get_parameter("safe_anafi/bounds/max_y", bounds(1,1));
-	this->get_parameter("safe_anafi/bounds/max_z", bounds(1,2));
-	
+    // Parameters
+    callback = this->add_on_set_parameters_callback(std::bind(&SafeAnafi::parameter_callback, this, std::placeholders::_1));
+
+    rcl_interfaces::msg::ParameterDescriptor parameter_descriptor;
+    rcl_interfaces::msg::IntegerRange integer_range;
+    rcl_interfaces::msg::FloatingPointRange floating_point_range;
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+    parameter_descriptor.description = "Enable hand launched takeoff";
+    this->declare_parameter("hand_launch", true, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+    parameter_descriptor.description = "Enable control during takeoff";
+    this->declare_parameter("takingoff_control", false, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Enable control during landing";
+    this->declare_parameter("landing_control", false, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Fixed frame for velocity commands";
+    this->declare_parameter("fixed_frame", false, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Yaw in world frame";
+    this->declare_parameter("world_frame", false, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Mission type: 0 = flight plan, 1 = follow me";
+    integer_range = rcl_interfaces::msg::IntegerRange{};
+    integer_range.from_value = 0;
+    integer_range.to_value = 1;
+    integer_range.step = 1;
+    parameter_descriptor.integer_range.push_back(integer_range);
+    this->declare_parameter("mission_type", 0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Absolute path to the FlightPlan file";
+    std::string package_path = ament_index_cpp::get_package_share_directory("anafi_autonomy");
+    this->declare_parameter("flightplan_file", package_path + "/missions/test.mavlink", parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "FollowMe mode: 1 = look at the target without moving automatically, 2 = follow the target keeping the same vector, 3 = follow the target keeping the same orientation to its direction, 4 = follow the target as it was held by a leash";
+    integer_range = rcl_interfaces::msg::IntegerRange{};
+    integer_range.from_value = 1;
+    integer_range.to_value = 4;
+    integer_range.step = 1;
+    parameter_descriptor.integer_range.push_back(integer_range);
+    this->declare_parameter("followme_mode", 2, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Position proportional gain";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 10.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("gains/position/p", 2.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Position integral gain";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 10.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("gains/position/i", 1.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Position derivative gain";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 10.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("gains/position/d", 0.5, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Position max integral component";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 1.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("gains/position/max_i", 0.1, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Velocity proportional gain";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 10.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("gains/velocity/p", 9.1, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Velocity derivative gain";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 10.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("gains/velocity/d", 1.3, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Yaw proportional gain";
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 100.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("gains/yaw/p", 70.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Min x bound";
+    parameter_descriptor.read_only = true;
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = -4000.0;
+    floating_point_range.to_value = 4000.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("bounds/x/min", -1.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Max x bound";
+    parameter_descriptor.read_only = true;
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = -4000.0;
+    floating_point_range.to_value = 4000.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("bounds/x/max", 1.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Min y bound";
+    parameter_descriptor.read_only = true;
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = -4000.0;
+    floating_point_range.to_value = 4000.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("bounds/y/min", -1.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Max y bound";
+    parameter_descriptor.read_only = true;
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = -4000.0;
+    floating_point_range.to_value = 4000.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("bounds/y/max", 1.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Min z bound";
+    parameter_descriptor.read_only = true;
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 4000.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("bounds/z/min", 0.0, parameter_descriptor);
+
+    parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+    parameter_descriptor.description = "Max z bound";
+    parameter_descriptor.read_only = true;
+    floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+    floating_point_range.from_value = 0.0;
+    floating_point_range.to_value = 4000.0;
+    floating_point_range.step = 0.0;
+    parameter_descriptor.floating_point_range.push_back(floating_point_range);
+    this->declare_parameter("bounds/z/max", 1.0, parameter_descriptor);
+
+	// Timer
+	timer = this->create_wall_timer(10ms, std::bind(&SafeAnafi::timer_callback, this));
+
+	// Initialise the set of velocities
 	geometry_msgs::msg::Twist t;
 	velocities.clear();
 	for(int i = 0; i < FILTER_SIZE; ++i)
 		velocities.push_back(t);
-				
-	timer = this->create_wall_timer(10ms, std::bind(&SafeAnafi::timer_callback, this));
+
+	// Parameters client
+	auto parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(this, "anafi");
+    param_events_subscriber = parameters_client->on_parameter_event(std::bind(&SafeAnafi::parameter_events_callback, this, std::placeholders::_1));
+}
+
+rcl_interfaces::msg::SetParametersResult SafeAnafi::parameter_callback(const std::vector<rclcpp::Parameter> &parameters){
+    auto result = rcl_interfaces::msg::SetParametersResult();
+    result.successful = true;
+
+    for(auto &parameter:parameters){
+        if(parameter.get_name() == "hand_launch"){
+            hand_launch = parameter.as_bool();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'hand_launch' set to %s", hand_launch ? "true" : "false");
+            return result;
+        }
+        if(parameter.get_name() == "takingoff_control"){
+            takingoff_control = parameter.as_bool();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'takingoff_control' set to %s", takingoff_control ? "true" : "false");
+            return result;
+        }
+        if(parameter.get_name() == "landing_control"){
+            landing_control = parameter.as_bool();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'landing_control' set to %s", landing_control ? "true" : "false");
+            return result;
+        }
+        if(parameter.get_name() == "fixed_frame"){
+            fixed_frame = parameter.as_bool();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'fixed_frame' set to %s", fixed_frame ? "true" : "false");
+            return result;
+        }
+        if(parameter.get_name() == "world_frame"){
+            world_frame = parameter.as_bool();
+            if(!world_frame)
+			    initial_yaw = yaw;
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'world_frame' set to %s", world_frame ? "true" : "false");
+            return result;
+        }
+        if(parameter.get_name() == "mission_type"){
+            mission_type = parameter.as_int();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'mission_type' set to %i", mission_type);
+            return result;
+        }
+        if(parameter.get_name() == "flightplan_file"){
+            flightplan_file = parameter.as_string();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'flightplan_file' set to '%s'", flightplan_file.c_str());
+            return result;
+        }
+        if(parameter.get_name() == "followme_mode"){
+            followme_mode = parameter.as_int();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'followme_mode' set to %i", followme_mode);
+            return result;
+        }
+        if(parameter.get_name() == "gains/position/p"){
+            k_p_position = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_p_position' set to %.1f", k_p_position);
+            return result;
+        }
+        if(parameter.get_name() == "gains/position/i"){
+            k_i_position = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_i_position' set to %.1f", k_i_position);
+            return result;
+        }
+        if(parameter.get_name() == "gains/position/d"){
+            k_d_position = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_d_position' set to %.1f", k_d_position);
+            return result;
+        }
+        if(parameter.get_name() == "gains/position/max_i"){
+            max_i_position = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_i_position' set to %.1f", max_i_position);
+            return result;
+        }
+        if(parameter.get_name() == "gains/velocity/p"){
+            k_p_velocity = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_p_velocity' set to %.1f", k_p_velocity);
+            return result;
+        }
+        if(parameter.get_name() == "gains/velocity/d"){
+            k_d_velocity = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_d_velocity' set to %.1f", k_d_velocity);
+            return result;
+        }
+        if(parameter.get_name() == "gains/yaw/p"){
+            k_p_yaw = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_p_yaw' set to %.1f", k_p_yaw);
+            return result;
+        }
+        if(parameter.get_name() == "bounds/x/min"){
+            bounds(0,0) = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'bounds_x_min' set to %.1f", bounds(0,0));
+            return result;
+        }
+        if(parameter.get_name() == "bounds/x/max"){
+            bounds(0,1) = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'bounds_x_max' set to %.1f", bounds(0,1));
+            return result;
+        }
+        if(parameter.get_name() == "bounds/y/min"){
+            bounds(1,0) = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'bounds_y_min' set to %.1f", bounds(1,0));
+            return result;
+        }
+        if(parameter.get_name() == "bounds/y/max"){
+            bounds(1,1) = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'bounds_y_max' set to %.1f", bounds(1,1));
+            return result;
+        }
+        if(parameter.get_name() == "bounds/z/min"){
+            bounds(2,0) = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'bounds_z_min' set to %.1f", bounds(2,0));
+            return result;
+        }
+        if(parameter.get_name() == "bounds/z/max"){
+            bounds(2,1) = parameter.as_double();
+            RCLCPP_DEBUG(this->get_logger(), "Parameter 'bounds_z_max' set to %.1f", bounds(2,1));
+            return result;
+        }
+    }
+
+    result.successful = false;
+    return result;
+}
+
+void SafeAnafi::parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event){
+    for(rcl_interfaces::msg::Parameter & changed_parameter : event->changed_parameters)
+        parameter_assign(changed_parameter);
+    for(rcl_interfaces::msg::Parameter & new_parameter : event->new_parameters)
+        parameter_assign(new_parameter);
+}
+
+void SafeAnafi::parameter_assign(rcl_interfaces::msg::Parameter & parameter){
+    if(parameter.name == "max_vertical_speed"){
+        max_vertical_speed = parameter.value.double_value;
+        RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_vertical_speed' set to %.1f", max_vertical_speed);
+    }
+    if(parameter.name == "max_yaw_rotation_speed"){
+        max_yaw_rotation_speed = parameter.value.double_value;
+        RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_yaw_rotation_speed' set to %.1f", max_yaw_rotation_speed);
+    }
+    if(parameter.name == "max_horizontal_speed"){
+        max_horizontal_speed = parameter.value.double_value;
+        RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_horizontal_speed' set to %.1f", max_horizontal_speed);
+    }
+    if(parameter.name == "max_tilt"){
+        max_tilt = parameter.value.double_value;
+        RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_tilt' set to %.1f", max_tilt);
+    }
 }
 
 void SafeAnafi::timer_callback(){
@@ -194,14 +468,11 @@ void SafeAnafi::timer_callback(){
 }
 
 void SafeAnafi::actionCallback(const std_msgs::msg::Int8& action_msg){
-	action = static_cast<Actions>(action_msg.data);
+    action = static_cast<Actions>(action_msg.data);
 }
 
 void SafeAnafi::skycontrollerCallback(const olympe_bridge_interfaces::msg::SkycontrollerCommand& command_msg){
 	// Drone commands
-	this->get_parameter("anafi/max_vertical_speed", max_vertical_speed);
-	this->get_parameter("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
-	this->get_parameter("anafi/max_horizontal_speed", max_horizontal_speed);
 	command_skycontroller << max_horizontal_speed/100*command_msg.x, -max_horizontal_speed/100*command_msg.y, max_vertical_speed/100*command_msg.z, -max_yaw_rotation_speed/100*command_msg.yaw;
 	mode_skycontroller << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE),
 			(command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
@@ -220,9 +491,6 @@ void SafeAnafi::skycontrollerCallback(const olympe_bridge_interfaces::msg::Skyco
 }
 
 void SafeAnafi::keyboardCallback(const anafi_autonomy::msg::KeyboardDroneCommand& command_msg){
-	this->get_parameter("anafi/max_vertical_speed", max_vertical_speed);
-	this->get_parameter("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
-	this->get_parameter("anafi/max_horizontal_speed", max_horizontal_speed);
 	command_keyboard << max_horizontal_speed*command_msg.x, max_horizontal_speed*command_msg.y, max_vertical_speed*command_msg.z, max_yaw_rotation_speed*command_msg.yaw;
 	mode_keyboard << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE),
 			(command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
@@ -270,7 +538,7 @@ void SafeAnafi::attitudeCallback(const anafi_autonomy::msg::AttitudeCommand& com
 	mode_offboard << COMMAND_ANGLE, COMMAND_VELOCITY, COMMAND_ANGLE;
 }
 
-void SafeAnafi::trajectoryCallback(const anafi_autonomy::msg::PoseCommand& command_msg){ //TODO: Implement this function
+void SafeAnafi::trajectoryCallback(__attribute__((unused)) const anafi_autonomy::msg::PoseCommand& command_msg){ //TODO: Implement this function
 	//desired_pose << command_msg.x, command_msg.y, command_msg.z, command_msg.yaw*M_PI/180;
 	//mode_offboard << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ANGLE;
 }
@@ -293,7 +561,7 @@ void SafeAnafi::stateCallback(const std_msgs::msg::String& state_msg){ // 'LANDE
 	state = resolveState(state_msg.data);
 }
 
-void SafeAnafi::gpsCallback(const sensor_msgs::msg::NavSatFix& gps_msg){ //TODO: Implement this function
+void SafeAnafi::gpsCallback(__attribute__((unused)) const sensor_msgs::msg::NavSatFix& gps_msg){ //TODO: Implement this function
 
 }
 
@@ -367,13 +635,18 @@ void SafeAnafi::stateMachine(){
 		RCLCPP_INFO(this->get_logger(), "Reseting position and heading");
 		position << 0, 0, 0;
 		initial_yaw = yaw;
+		action = NONE;
 		return;
 	case REMOTE_CONTROL:
 		offboard_client->async_send_request(false_request);
+		action = NONE;
 		return;
 	case OFFBOARD_CONTROL:
 		offboard_client->async_send_request(true_request);
+		action = NONE;
 		return;
+	default:
+  		break;
 	}
 
 	switch(state){
@@ -419,6 +692,8 @@ void SafeAnafi::stateMachine(){
 		case CALIBRATE:
 			calibrate_magnetometer_client->async_send_request(trigger_request);
 			break;
+		default:
+			break;
 		}
 		break;
 	case MOTOR_RAMPING:
@@ -427,6 +702,8 @@ void SafeAnafi::stateMachine(){
 		case LAND:
 		case HALT:
 			arm_client->async_send_request(false_request);
+			break;
+		default:
 			break;
 		}
 		break;
@@ -440,6 +717,8 @@ void SafeAnafi::stateMachine(){
 		case TAKEOFF:
 			arm_client->async_send_request(false_request); // needs to stop the motors before taking off
 			takeoff_client->async_send_request(trigger_request);
+			break;
+		default:
 			break;
 		}
 		break;
@@ -518,7 +797,10 @@ void SafeAnafi::stateMachine(){
 		case HALT:
 			takeoff_client->async_send_request(trigger_request);
 			break;
+		default:
+			break;
 		}
+		break;
 	case INVALID:
 		switch(action){
 		case HALT:
@@ -527,9 +809,11 @@ void SafeAnafi::stateMachine(){
 		case REBOOT:
 			reboot_client->async_send_request(trigger_request);
 			break;
+		default:
+			break;
 		}
 	}
-
+	
 	action = NONE;
 }
 
@@ -561,8 +845,8 @@ void SafeAnafi::controllers(){
 		break;
 	case COMMAND_POSITION: // position
 		if(localization){
-			command_move(0) = BOUND(command_move(0), bounds(0,0), bounds(1,0));
-			command_move(1) = BOUND(command_move(1), bounds(0,1), bounds(1,1));
+			command_move(0) = BOUND(command_move(0), bounds(0,0), bounds(0,1));
+			command_move(1) = BOUND(command_move(1), bounds(1,0), bounds(1,1));
 			// TODO: IMPLEMENT POSITION CONTROLLER HERE
 		}
 		else{
@@ -570,8 +854,8 @@ void SafeAnafi::controllers(){
 			command_move(1) = 0;
 			// TODO: THROW A WARNING, IF NO LOCALISATION
 		}
+		[[fallthrough]];
 	case COMMAND_VELOCITY: // velocity
-		this->get_parameter("anafi/max_horizontal_speed", max_horizontal_speed);
 		command_move(0) = BOUND(command_move(0), max_horizontal_speed);
 		command_move(1) = BOUND(command_move(1), max_horizontal_speed);
 
@@ -583,8 +867,8 @@ void SafeAnafi::controllers(){
 
 		command_move(0) = -(k_p_velocity*velocity_error(1) + k_d_velocity*velocity_error_d(1));
 		command_move(1) =   k_p_velocity*velocity_error(0) + k_d_velocity*velocity_error_d(0);
+		[[fallthrough]];
 	case COMMAND_ANGLE: // attitude
-		this->get_parameter("anafi/max_tilt", max_tilt);
 		command_move(0) = BOUND(command_move(0), max_tilt);
 		command_move(1) = BOUND(command_move(1), max_tilt);
 		rpyg_msg.roll = command_move(0);
@@ -602,13 +886,13 @@ void SafeAnafi::controllers(){
 		rpyg_msg.gaz = 0;
 		break;
 	case COMMAND_POSITION: // position
-		command_move(2) = BOUND(command_move(2), bounds(0,2), bounds(1,2));
+		command_move(2) = BOUND(command_move(2), bounds(2,0), bounds(2,1));
 		position_error(2) = command_move(2) - position(2);
 		position_error_d(2) = -velocity(2);
 		position_error_i(2) = BOUND(position_error_i(2) + position_error(2)*dt, max_i_position);
 		command_move(2) = k_p_position*position_error(2) + k_i_position*position_error_i(2) + k_d_position*position_error_d(2);
+		[[fallthrough]];
 	case COMMAND_VELOCITY: // velocity
-		this->get_parameter("anafi/max_vertical_speed", max_vertical_speed);
 		command_move(2) = BOUND(command_move(2), max_vertical_speed);
 		rpyg_msg.gaz = command_move(2);
 		break;
@@ -625,8 +909,8 @@ void SafeAnafi::controllers(){
 	case COMMAND_ANGLE: // attitude
 		yaw = denormalizeAngle(yaw, command_move(3));
 		command_move(3) = k_p_yaw*(command_move(3) - yaw);
+		[[fallthrough]];
 	case COMMAND_RATE: // angular rate
-		this->get_parameter("anafi/max_yaw_rotation_speed", max_yaw_rotation_speed);
 		command_move(3) = BOUND(command_move(3), max_yaw_rotation_speed);
 		rpyg_msg.yaw = command_move(3);
 		break;
@@ -684,14 +968,7 @@ int main(int argc, char** argv){
 	rclcpp::spin(std::make_shared<SafeAnafi>());
 	
 	RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "SafeAnafi is stopping...");
-	/*rpyg_msg.roll = 0;
-	rpyg_msg.pitch = 0;
-	rpyg_msg.yaw = 0;
-	rpyg_msg.gaz = 0;
-	rpyg_publisher->publish(rpyg_msg);
-	rpyg_publisher->publish(rpyg_msg);
-	land_client->async_send_request(trigger_request);
-	land_client->async_send_request(trigger_request);*/
+
 	rclcpp::shutdown();
 	return 0;
 }
