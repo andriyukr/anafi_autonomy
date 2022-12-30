@@ -50,15 +50,17 @@
 
 #define KEYCODE_ACCENT 96
 
-#define KEYCODE_8     56
+#define KEYCODE_0     48
+#define KEYCODE_2     50
 #define KEYCODE_4     52
 #define KEYCODE_5     53
 #define KEYCODE_6     54
-#define KEYCODE_2     50
+#define KEYCODE_7     55
+#define KEYCODE_8     56
+#define KEYCODE_9     57
 #define KEYCODE_MINUS 45
 #define KEYCODE_PLUS  43
 #define KEYCODE_Enter 10
-#define KEYCODE_0     48
 #define KEYCODE_DOT   46
 #define KEYCODE_SLASH 47
 
@@ -164,7 +166,7 @@ class Teleop : public rclcpp::Node{
 			case KEYCODE_F7: // stop mission
 				action.data = 13;
 				break;
-			case KEYCODE_F12: // calibrate megnetometer!
+			case KEYCODE_F12: // calibrate magnetometer!
 				action.data = 111;
 				break;
 
@@ -201,10 +203,10 @@ class Teleop : public rclcpp::Node{
 			case KEYCODE_5: // reset to (0, 0)
 				camera_msg.action = 11;
 				break;
-			case KEYCODE_4: // pitch left
+			case KEYCODE_7: // pitch left
 				camera_msg.roll = -1;
 				break;
-			case KEYCODE_6: // pitch right
+			case KEYCODE_9: // pitch right
 				camera_msg.roll = 1;
 				break;
 			case KEYCODE_8: // roll up
@@ -212,6 +214,12 @@ class Teleop : public rclcpp::Node{
 				break;
 			case KEYCODE_2: // roll down
 				camera_msg.pitch = 1;
+				break;
+			case KEYCODE_4: // yaw left
+				camera_msg.yaw = -1;
+				break;
+			case KEYCODE_6: // yaw right
+				camera_msg.yaw = 1;
 				break;
 
 			/* camera commands */
@@ -249,7 +257,7 @@ class Teleop : public rclcpp::Node{
 		}
 };
 
-void quit(int sig){
+void quit(__attribute__((unused)) int sig){
 	tcsetattr(kfd, TCSANOW, &cooked);
 }
 

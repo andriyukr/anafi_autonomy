@@ -9,21 +9,13 @@
 
 #include "anafi_autonomy/trajectory.h"
 
-// ********************** Callbacks **********************
-
-// Dynamic reconfigure callback function (from GUI)
-/*void dynamicReconfigureCallback(anafi_autonomy::setTrajectoryConfig &config, uint32_t level){
-	trajectory_type = config.trajectory;
-	pose_d << config.x_d, config.y_d, config.z_d, config.yaw_d;
-}*/
-
+// ********************** Constructor **********************
 Trajectory::Trajectory() : Node("trajectory"){
 	RCLCPP_INFO(this->get_logger(), "Trajectory is running...");
 
     // Publishers
-	pose_publisher = this->create_publisher<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS());
-	velocity_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/reference_velocity", rclcpp::SystemDefaultsQoS());
-	axes_publisher = this->create_publisher<anafi_autonomy::msg::AxesCommand>("drone/command_offboard", rclcpp::SystemDefaultsQoS());
+    reference_publisher = this->create_publisher<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS());
+	derivative_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/reference_derivative", rclcpp::SystemDefaultsQoS());
 
 	// Parameters
     callback = this->add_on_set_parameters_callback(std::bind(&Trajectory::parameterCallback, this, std::placeholders::_1));
@@ -104,48 +96,40 @@ rcl_interfaces::msg::SetParametersResult Trajectory::parameterCallback(const std
 void Trajectory::timer_callback(){
 	switch(trajectory_type){
 	case 0: // no command
-		pose << 0, 0, 0, 0;
-		velocity << 0, 0, 0, 0;
-		mode << 0, 0, 0;
+		reference << 0, 0, 0, 0;
+		derivative << 0, 0, 0, 0;
+		mode << COMMAND_NONE, COMMAND_NONE, COMMAND_NONE;
 		break;
 	case 1: // hover
-		pose << 0, 0, 1, pose_d(3);
-		velocity << 0, 0, 0, 0;
-		mode << 0, 0, 3;
+		reference << 0, 0, 1, pose_d(3);
+		derivative << 0, 0, 0, 0;
+		mode << COMMAND_VELOCITY, COMMAND_POSITION, COMMAND_ANGLE;
 		break;
 	case 2: // user
-		pose = pose_d;
-		velocity << 0, 0, 0, 0;
-		mode << 1, 1, 3;
+		reference = pose_d;
+		derivative << 0, 0, 0, 0;
+		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ANGLE;
 		break;
 	}
 
-	// Publish the reference trajectory
-	pose_msg.header.stamp = this->get_clock()->now();
-	pose_msg.x = pose(0);
-	pose_msg.y = pose(1);
-	pose_msg.z = pose(2);
-	pose_msg.yaw = pose(3);
-	pose_publisher->publish(pose_msg);
+	// Publish the corresponding reference for each axis
+	reference_msg.header.stamp = this->get_clock()->now();
+	reference_msg.horizontal_mode = mode(0);
+	reference_msg.x = reference(0);
+	reference_msg.y = reference(1);
+	reference_msg.vertical_mode = mode(1);
+	reference_msg.z = reference(2);
+	reference_msg.heading_mode = mode(2);
+	reference_msg.yaw = reference(3);
+	reference_publisher->publish(reference_msg);
 
 	// Publish the corresponding reference trajectory velocity
-	velocity_msg.header.stamp = this->get_clock()->now();
-	velocity_msg.vx = velocity(0);
-	velocity_msg.vy = velocity(1);
-	velocity_msg.vz = velocity(2);
-	velocity_msg.yaw_rate = velocity(3);
-	velocity_publisher->publish(velocity_msg);
-
-	// Publish the corresponding reference for each axis
-	axes_msg.header.stamp = this->get_clock()->now();
-	axes_msg.horizontal_mode = mode(0);
-	axes_msg.x = pose(0);
-	axes_msg.y = pose(1);
-	axes_msg.vertical_mode = mode(1);
-	axes_msg.z = pose(2);
-	axes_msg.heading_mode = mode(2);
-	axes_msg.yaw = pose(3);
-	axes_publisher->publish(axes_msg);
+	derivative_msg.header.stamp = this->get_clock()->now();
+	derivative_msg.vx = derivative(0);
+	derivative_msg.vy = derivative(1);
+	derivative_msg.vz = derivative(2);
+	derivative_msg.yaw_rate = derivative(3);
+	derivative_publisher->publish(derivative_msg);
 }
 
 int main(int argc, char** argv){

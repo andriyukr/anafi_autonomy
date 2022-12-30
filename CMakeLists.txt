@@ -22,11 +22,10 @@ find_package(tf2 REQUIRED)
 find_package(olympe_bridge_interfaces REQUIRED)
 
 set(msg_files
-	"msg/DesiredCommand.msg"
+	"msg/ReferenceCommand.msg"
 	"msg/PoseCommand.msg"
 	"msg/VelocityCommand.msg"
 	"msg/AttitudeCommand.msg"
-	"msg/AxesCommand.msg"
 	"msg/KeyboardDroneCommand.msg"
 	"msg/KeyboardCameraCommand.msg"
 )

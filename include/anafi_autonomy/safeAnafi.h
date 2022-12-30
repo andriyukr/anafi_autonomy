@@ -8,6 +8,7 @@
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
+#include <geometry_msgs/msg/quaternion_stamped.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <geometry_msgs/msg/vector3_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -31,11 +32,13 @@
 #include <olympe_bridge_interfaces/msg/skycontroller_command.hpp>
 #include <olympe_bridge_interfaces/srv/flight_plan.hpp>
 #include <olympe_bridge_interfaces/srv/follow_me.hpp>
+#include <olympe_bridge_interfaces/srv/photo.hpp>
+#include <olympe_bridge_interfaces/srv/recording.hpp>
 
+#include <anafi_autonomy/msg/reference_command.hpp>
 #include <anafi_autonomy/msg/pose_command.hpp>
 #include <anafi_autonomy/msg/velocity_command.hpp>
 #include <anafi_autonomy/msg/attitude_command.hpp>
-#include <anafi_autonomy/msg/desired_command.hpp>
 #include <anafi_autonomy/msg/keyboard_drone_command.hpp>
 #include <anafi_autonomy/msg/keyboard_camera_command.hpp>
 
@@ -95,22 +98,26 @@ class SafeAnafi : public rclcpp::Node{
 		SafeAnafi();
 
 	private:			
-		// Subsribers
+		// Subsribers	
 		rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr action_subscriber;
 		rclcpp::Subscription<olympe_bridge_interfaces::msg::SkycontrollerCommand>::SharedPtr command_skycontroller_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::KeyboardDroneCommand>::SharedPtr command_keyboard_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::KeyboardCameraCommand>::SharedPtr command_camera_subscriber;
-		rclcpp::Subscription<anafi_autonomy::msg::PoseCommand>::SharedPtr desired_pose_subscriber; // DEPRECATED
-		rclcpp::Subscription<anafi_autonomy::msg::VelocityCommand>::SharedPtr desired_velocity_subscriber; // DEPRECATED
-		rclcpp::Subscription<anafi_autonomy::msg::AttitudeCommand>::SharedPtr desired_attitude_subscriber; // DEPRECATED
-		rclcpp::Subscription<anafi_autonomy::msg::PoseCommand>::SharedPtr desired_trajectory_subscriber;
-		rclcpp::Subscription<anafi_autonomy::msg::DesiredCommand>::SharedPtr desired_axis_subscriber;
-		rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr desired_gimbal_subscriber;
-		rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr desired_zoom_subscriber;
+		rclcpp::Subscription<anafi_autonomy::msg::PoseCommand>::SharedPtr reference_pose_subscriber;
+		rclcpp::Subscription<anafi_autonomy::msg::VelocityCommand>::SharedPtr reference_velocity_subscriber;
+		rclcpp::Subscription<anafi_autonomy::msg::AttitudeCommand>::SharedPtr reference_attitude_subscriber;
+	    	rclcpp::Subscription<anafi_autonomy::msg::ReferenceCommand>::SharedPtr reference_command_subscriber;
+		rclcpp::Subscription<anafi_autonomy::msg::VelocityCommand>::SharedPtr derivative_command_subscriber;
+		rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr reference_gimbal_subscriber;
+		rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr reference_zoom_subscriber;
 		rclcpp::Subscription<std_msgs::msg::String>::SharedPtr state_subscriber;
 		rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_subscriber;
+		rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr altitude_subscriber;
+		rclcpp::Subscription<geometry_msgs::msg::QuaternionStamped>::SharedPtr attitude_subscriber;
+		rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr speed_subscriber;
 		rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber;
-		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr optitrack_subscriber;
+		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscriber;
+
 		
 		// Publishers
 		rclcpp::Publisher<olympe_bridge_interfaces::msg::PilotingCommand>::SharedPtr rpyg_publisher;
@@ -137,12 +144,12 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Client<olympe_bridge_interfaces::srv::FollowMe>::SharedPtr followme_start_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr followme_stop_client;
 		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr offboard_client;
-		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr take_photo_client;
-		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr start_recording_client;
-		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr stop_recording_client;
+		rclcpp::Client<olympe_bridge_interfaces::srv::Photo>::SharedPtr take_photo_client;
+		rclcpp::Client<olympe_bridge_interfaces::srv::Recording>::SharedPtr start_recording_client;
+		rclcpp::Client<olympe_bridge_interfaces::srv::Recording>::SharedPtr stop_recording_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reset_zoom_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reset_gimbal_client;
-		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr download_media_client;
+		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr download_media_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr calibrate_magnetometer_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr calibrate_gimbal_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reboot_client;
@@ -154,6 +161,8 @@ class SafeAnafi : public rclcpp::Node{
 		std::shared_ptr<std_srvs::srv::Trigger_Request_<std::allocator<void>>> trigger_request;
 		std::shared_ptr<std_srvs::srv::SetBool_Request_<std::allocator<void>>> true_request;
 		std::shared_ptr<std_srvs::srv::SetBool_Request_<std::allocator<void>>> false_request;
+		std::shared_ptr<olympe_bridge_interfaces::srv::Photo_Request_<std::allocator<void>>> photo_request;
+		std::shared_ptr<olympe_bridge_interfaces::srv::Recording_Request_<std::allocator<void>>> recording_request;
 		
 		// Parameter client
 		rclcpp::AsyncParametersClient::SharedPtr parameters_client;
@@ -175,6 +184,11 @@ class SafeAnafi : public rclcpp::Node{
 		bool hand_launch = false;
 		bool takingoff_control = false;
 		bool landing_control = false;
+	        bool attitude_available = false;
+	        bool pose_available = false;
+	       	bool odometry_available = false;
+	       	bool altitude_available = false;
+	       	bool velocity_available = false;
 		
 		// Variables
 		States state = LANDED;
@@ -218,15 +232,16 @@ class SafeAnafi : public rclcpp::Node{
 		Vector4d desired_pose = Vector4d::Zero();
 		Vector4d desired_velocity = Vector4d::Zero();
 		Vector4d desired_attitude = Vector4d::Zero();
+		Vector4d derivative_command = Vector4d::Zero();
 		Vector4d command_move = Vector4d::Zero();
 		Vector3i mode_keyboard = Vector3i::Zero();
 		Vector3i mode_skycontroller = Vector3i::Zero();
 		Vector3i mode_offboard = Vector3i::Zero();
 		Vector3i mode_move = Vector3i::Zero();
-		Vector2d gimbal_command = Vector2d::Zero();
-		Vector2d controller_gimbal_command = Vector2d::Zero();
-		Vector2d keyboard_gimbal_command = Vector2d::Zero();
-		Vector2d offboard_gimbal_command = Vector2d::Zero();
+		Vector3d gimbal_command = Vector3d::Zero();
+		Vector3d controller_gimbal_command = Vector3d::Zero();
+		Vector3d keyboard_gimbal_command = Vector3d::Zero();
+		Vector3d offboard_gimbal_command = Vector3d::Zero();
 		double zoom_command = 0;
 		double controller_zoom_command = 0;
 		double keyboard_zoom_command = 0;
@@ -259,22 +274,25 @@ class SafeAnafi : public rclcpp::Node{
 		// Callbacks
 		void timer_callback();
 		void parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
-		rcl_interfaces::msg::SetParametersResult parameter_callback(const std::vector<rclcpp::Parameter> &parameters);
+		rcl_interfaces::msg::SetParametersResult parameter_callback(const std::vector<rclcpp::Parameter> &parameters);	
 		void actionCallback(const std_msgs::msg::Int8& action_msg);
 		void skycontrollerCallback(const olympe_bridge_interfaces::msg::SkycontrollerCommand& command_msg);
 		void keyboardCallback(const anafi_autonomy::msg::KeyboardDroneCommand& command_msg);
 		void cameraCallback(const anafi_autonomy::msg::KeyboardCameraCommand& command_msg);
-		void gimbalCallback(const geometry_msgs::msg::Vector3& command_msg);
-		void velocityCallback(const anafi_autonomy::msg::VelocityCommand& desired_msg);
-		void attitudeCallback(const anafi_autonomy::msg::AttitudeCommand& desired_msg);
-		void trajectoryCallback(const anafi_autonomy::msg::PoseCommand& desired_msg);
-		void commandCallback(const anafi_autonomy::msg::DesiredCommand& desired_msg);
-		void zoomCallback(const std_msgs::msg::Float32& command_msg);
-		void poseCallback(const anafi_autonomy::msg::PoseCommand& desired_msg);
+		void referencePoseCallback(const anafi_autonomy::msg::PoseCommand& command_msg);
+		void referenceVelocityCallback(const anafi_autonomy::msg::VelocityCommand& command_msg);
+		void referenceAttitudeCallback(const anafi_autonomy::msg::AttitudeCommand& command_msg);
+		void referenceCommandCallback(const anafi_autonomy::msg::ReferenceCommand& command_msg);
+		void derivativeCommandCallback(const anafi_autonomy::msg::VelocityCommand& derivative_msg);
+		void referenceGimbalCallback(const geometry_msgs::msg::Vector3& command_msg);
+		void referenceZoomCallback(const std_msgs::msg::Float32& command_msg);
 		void stateCallback(const std_msgs::msg::String& state_msg);
 		void gpsCallback(const sensor_msgs::msg::NavSatFix& gps_msg);
+		void altitudeCallback(const std_msgs::msg::Float32& altitude_msg);
+		void attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg);
+		void speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg);
+		void poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
 		void odometryCallback(const nav_msgs::msg::Odometry& odometry_msg);
-		void optitrackCallback(const geometry_msgs::msg::PoseStamped& optitrack_msg);
 
 		// Functions
 		void stateMachine();
