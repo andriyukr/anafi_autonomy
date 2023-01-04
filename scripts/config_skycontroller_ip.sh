@@ -15,6 +15,7 @@
 
 set -e
 
+
 action=$1
 interface=$2
 address=$3
@@ -22,7 +23,7 @@ route_tableid=$4
 # shellcheck disable=SC2046,SC2116,SC2086
 address_hex=0x$(printf '%02X' $(echo ${address//./ }))
 
-# Outbound traffic iptables rules: packets addressed to the virtual SKYCONTROLLER's IP address are marked to be routed on the correct interface and then get NATed to match the actual SKYCONTROLLER's IP address on this interface
+# Outbound traffic iptables rules: packets addressed to the virtual SKYCONTROLLER's IP address are marked in order to be routed on the correct interface and then get NATed to match the actual SKYCONTROLLER's IP address on this interface
 OUT_RULES=$(cat <<EOF 
 mangle:OUTPUT      --destination      $address     -j MARK --set-mark $address_hex
 nat:OUTPUT         -m mark --mark $address_hex     -j DNAT --to-destination 192.168.53.1 
@@ -45,43 +46,18 @@ EOF
 
 case $action in
 setup)
-  echo "Setup $interface $address $route_tableid"
-  
-  echo "---------- 0"
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 1"
+echo "Setup $interface $address ($address_hex) $route_tableid"
   # Add the SKYCONTROLLER "virtual" IP
   sudo ip addr del "$address"/24 dev "$interface" > /dev/null 2>&1|| true
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 2"
   sudo ip addr add "$address"/24 dev "$interface"
-  ip route s | grep "$interface" || true
 
-  echo "---------- 3"
   # Don't rely on the IP the SKYCONTROLLER dhcp gave us
   sudo ip addr del 192.168.53.254/24 dev "$interface" > /dev/null 2>&1|| true
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 4"
   sudo ip addr add 192.168.53.254/24 dev "$interface"
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 5"
   sudo ip link set dev "$interface" down
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 6"
   sudo sysctl -w "net.ipv4.conf.$interface.rp_filter=0"
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 7"
   # FIXME: We shouldn't have to deactivate rp_filter for all interfaces
   sudo sysctl -w "net.ipv4.conf.all.rp_filter=0"
-  ip route s | grep "$interface" || true
-   
-  echo "---------- 8"
   while read -r rule; do
     table="${rule%:*}"
     rule="${rule#*:}"
@@ -91,31 +67,14 @@ setup)
       sudo iptables --wait -t "$table" -A $rule
     fi
   done <<< "$RULES"
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 9"
   sudo ip link set dev "$interface" up
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 10"
-  #sudo ip addr flush dev usb0
   sudo ip route del default via 192.168.53.254 dev "$interface" table "$route_tableid" > /dev/null 2>&1|| true
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 11"
-  #sudo ip route add default via 192.168.53.254 dev "$interface" table "$route_tableid"
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 12"
+  sudo ip route add default via 192.168.53.254 dev "$interface" table "$route_tableid"
   sudo ip rule del fwmark "$address_hex" table "$route_tableid" > /dev/null 2>&1|| true
-  ip route s | grep "$interface" || true
-  
-  echo "---------- 13"
   sudo ip rule add fwmark "$address_hex" table "$route_tableid"
-  ip route s | grep "$interface" || true
   ;;
 clean)
-  echo "Clean $interface $address $route_tableid"
+  echo "Cleanup $interface $address ($address_hex) $route_tableid"
   sudo ip link set dev "$interface" up
   sudo ip addr del "$address"/24 dev "$interface" || true
   sudo ip addr del 192.168.53.254/24 dev "$interface" || true
