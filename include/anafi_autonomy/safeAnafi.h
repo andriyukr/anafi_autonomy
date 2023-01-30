@@ -46,7 +46,7 @@
 #define COMMAND_NONE 		0
 #define COMMAND_POSITION 	1
 #define COMMAND_VELOCITY 	2
-#define COMMAND_ANGLE 		3
+#define COMMAND_ATTITUDE 	3
 #define COMMAND_RATE 		4
 #define MODE_HORIZONTAL 	0
 #define MODE_VERTICAL 		1
@@ -184,11 +184,13 @@ class SafeAnafi : public rclcpp::Node{
 		bool hand_launch = false;
 		bool takingoff_control = false;
 		bool landing_control = false;
-	        bool attitude_available = false;
-	        bool pose_available = false;
-	       	bool odometry_available = false;
-	       	bool altitude_available = false;
-	       	bool velocity_available = false;
+	        
+	        // Feedback
+	        int attitude_available = 0;
+	        int pose_available = 0;
+	       	int odometry_available = 0;
+	       	int altitude_available = 0;
+	       	int velocity_available = 0;
 		
 		// Variables
 		States state = LANDED;
@@ -199,11 +201,7 @@ class SafeAnafi : public rclcpp::Node{
 		Vector3d position_error = Vector3d::Zero();
 		Vector3d position_error_i = Vector3d::Zero();
 		Vector3d position_error_d = Vector3d::Zero();
-		Matrix<double, 3, 2> bounds {
-			{0, 0}, 	// {x_min, x_max}
-			{0, 0}, 	// {y_min, y_max}
-			{0, 0} 		// {z_min, z_max}
-		};
+		MatrixXd bounds = MatrixXd::Zero(3, 2);
 
 		// Attitude
 		Vector3d orientation = Vector3d::Zero();
@@ -261,14 +259,17 @@ class SafeAnafi : public rclcpp::Node{
 		double max_tilt;
 		double max_vertical_speed;
 		double max_horizontal_speed;
-		double max_yaw_rotation_speed;
+		double max_yaw_rate;
 		short mission_type = 0;
 		string flightplan_file;
 		short followme_mode = 0;
 
 		// Time
 		rclcpp::Time time;
-		rclcpp::Time time_old;
+		rclcpp::Time time_old_attitude;
+		rclcpp::Time time_old_speed;
+		rclcpp::Time time_old_pose;
+		rclcpp::Time time_old_odometry;
 		double dt = DBL_MAX;
 		
 		// Callbacks

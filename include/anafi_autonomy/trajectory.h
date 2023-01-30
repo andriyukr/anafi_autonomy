@@ -11,7 +11,7 @@
 #define COMMAND_NONE 		0
 #define COMMAND_POSITION 	1
 #define COMMAND_VELOCITY 	2
-#define COMMAND_ANGLE 		3
+#define COMMAND_ATTITUDE 	3
 #define COMMAND_RATE 		4
 
 using namespace std;

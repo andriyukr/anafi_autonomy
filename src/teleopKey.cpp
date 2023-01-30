@@ -172,28 +172,28 @@ class Teleop : public rclcpp::Node{
 
 			/* UAV movements */
 			case KEYCODE_a:
-				drone_msg.yaw = 1;
+				drone_msg.yaw = 100;
 				break;
 			case KEYCODE_d:
-				drone_msg.yaw = -1;
+				drone_msg.yaw = -100;
 				break;
 			case KEYCODE_w:
-				drone_msg.z = 1;
+				drone_msg.z = 100;
 				break;
 			case KEYCODE_s:
-				drone_msg.z = -1;
+				drone_msg.z = -100;
 				break;
 			case KEYCODE_RIGHT: // move right
-				drone_msg.y = -1;
+				drone_msg.y = -100;
 				break;
 			case KEYCODE_LEFT: // move left
-				drone_msg.y = 1;
+				drone_msg.y = 100;
 				break;
 			case KEYCODE_UP: // move forward
-				drone_msg.x = 1;
+				drone_msg.x = 100;
 				break;
 			case KEYCODE_DOWN: // move backward
-				drone_msg.x = -1;
+				drone_msg.x = -100;
 				break;
 
 			/* gimbal commadns */
@@ -204,30 +204,30 @@ class Teleop : public rclcpp::Node{
 				camera_msg.action = 11;
 				break;
 			case KEYCODE_7: // pitch left
-				camera_msg.roll = -1;
+				camera_msg.roll = -100;
 				break;
 			case KEYCODE_9: // pitch right
-				camera_msg.roll = 1;
+				camera_msg.roll = 100;
 				break;
 			case KEYCODE_8: // roll up
-				camera_msg.pitch = -1;
+				camera_msg.pitch = -100;
 				break;
 			case KEYCODE_2: // roll down
-				camera_msg.pitch = 1;
+				camera_msg.pitch = 100;
 				break;
 			case KEYCODE_4: // yaw left
-				camera_msg.yaw = -1;
+				camera_msg.yaw = -100;
 				break;
 			case KEYCODE_6: // yaw right
-				camera_msg.yaw = 1;
+				camera_msg.yaw = 100;
 				break;
 
 			/* camera commands */
 			case KEYCODE_PLUS: // zoom in
-				camera_msg.zoom = 1;
+				camera_msg.zoom = 100;
 				break;
 			case KEYCODE_MINUS: // zoom out
-				camera_msg.zoom = -1;
+				camera_msg.zoom = -100;
 				break;
 			case KEYCODE_Enter: // take picture
 				camera_msg.action = 1;

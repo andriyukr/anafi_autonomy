@@ -14,8 +14,8 @@ Trajectory::Trajectory() : Node("trajectory"){
 	RCLCPP_INFO(this->get_logger(), "Trajectory is running...");
 
     // Publishers
-    reference_publisher = this->create_publisher<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS());
-	derivative_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/reference_derivative", rclcpp::SystemDefaultsQoS());
+   reference_publisher = this->create_publisher<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS());
+   derivative_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/reference_derivative", rclcpp::SystemDefaultsQoS());
 
 	// Parameters
     callback = this->add_on_set_parameters_callback(std::bind(&Trajectory::parameterCallback, this, std::placeholders::_1));
@@ -99,16 +99,17 @@ void Trajectory::timer_callback(){
 		reference << 0, 0, 0, 0;
 		derivative << 0, 0, 0, 0;
 		mode << COMMAND_NONE, COMMAND_NONE, COMMAND_NONE;
+		return;
 		break;
 	case 1: // hover
 		reference << 0, 0, 1, pose_d(3);
 		derivative << 0, 0, 0, 0;
-		mode << COMMAND_VELOCITY, COMMAND_POSITION, COMMAND_ANGLE;
+		mode << COMMAND_VELOCITY, COMMAND_POSITION, COMMAND_ATTITUDE;
 		break;
 	case 2: // user
 		reference = pose_d;
 		derivative << 0, 0, 0, 0;
-		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ANGLE;
+		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ATTITUDE;
 		break;
 	}
 
