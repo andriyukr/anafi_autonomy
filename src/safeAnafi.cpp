@@ -546,8 +546,11 @@ void SafeAnafi::referenceAttitudeCallback(const anafi_autonomy::msg::AttitudeCom
 }
 
 void SafeAnafi::referenceCommandCallback(const anafi_autonomy::msg::ReferenceCommand& command_msg){
-	command_offboard <<     (command_msg.horizontal_mode != COMMAND_NONE ? command_msg.x : command_offboard(0)), (command_msg.horizontal_mode != COMMAND_NONE ? command_msg.y : command_offboard(1)),
-                            (command_msg.vertical_mode != COMMAND_NONE ? command_msg.z : command_offboard(2)), (command_msg.heading_mode != COMMAND_NONE ? command_msg.yaw*M_PI/180 : command_offboard(3));
+	command_offboard <<     (command_msg.horizontal_mode == COMMAND_NONE ? command_offboard(0) : command_msg.x),
+	                        (command_msg.horizontal_mode == COMMAND_NONE ? command_offboard(1) : command_msg.y),
+                            (command_msg.vertical_mode == COMMAND_NONE ? command_offboard(2) : command_msg.z),
+                            (command_msg.heading_mode == COMMAND_NONE ? command_offboard(3) :
+                                (command_msg.heading_mode == COMMAND_ATTITUDE ? command_msg.yaw*M_PI/180 : command_msg.yaw));
 	mode_offboard << command_msg.horizontal_mode, command_msg.vertical_mode, command_msg.heading_mode;
 }
 
@@ -575,7 +578,7 @@ void SafeAnafi::altitudeCallback(const std_msgs::msg::Float32& altitude_msg){
 	if(pose_available <= 0 && odometry_available <= 0){
         position(2) = altitude_msg.data;
 
-        altitude_available = 5;
+        altitude_available = 10;
 	}
 }
 
@@ -600,7 +603,7 @@ void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& qu
 
         time_old_attitude = time;
 
-        attitude_available = 5;
+        attitude_available = 10;
     }
 }
 
@@ -617,7 +620,7 @@ void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_ms
         velocity_old = velocity;
         time_old_speed = time;
 
-        velocity_available = 5;
+        velocity_available = 10;
 	}
 }
 
@@ -657,7 +660,7 @@ void SafeAnafi::poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 
 	time_old_pose = time;
 
-	pose_available = 15;
+	pose_available = 30;
 }
 
 void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
@@ -682,7 +685,7 @@ void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
 	velocity_old = velocity;
 	time_old_odometry = time;
 
-	odometry_available = 20;
+	odometry_available = 40;
 }
 
 void SafeAnafi::stateMachine(){

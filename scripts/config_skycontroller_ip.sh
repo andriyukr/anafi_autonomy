@@ -15,7 +15,6 @@
 
 set -e
 
-
 action=$1
 interface=$2
 address=$3

@@ -28,6 +28,7 @@ set(msg_files
 	"msg/AttitudeCommand.msg"
 	"msg/KeyboardDroneCommand.msg"
 	"msg/KeyboardCameraCommand.msg"
+	"msg/Position.msg"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
