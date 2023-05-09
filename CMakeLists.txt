@@ -19,7 +19,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
-find_package(olympe_bridge_interfaces REQUIRED)
+find_package(anafi_ros_interfaces REQUIRED)
 
 set(msg_files
 	"msg/ReferenceCommand.msg"
@@ -55,7 +55,7 @@ ament_target_dependencies(safe_anafi
 	nav_msgs
 	std_srvs
 	tf2
-	olympe_bridge_interfaces)
+	anafi_ros_interfaces)
 target_link_libraries(safe_anafi "${cpp_typesupport_target}")
 
 add_executable(teleop_key src/teleopKey.cpp)

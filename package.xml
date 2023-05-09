@@ -23,9 +23,9 @@
 	<depend>nav_msgs</depend>
 	<depend>std_srvs</depend>
 	<depend>tf2</depend>
-	<depend>olympe_bridge_interfaces</depend>
+	<depend>anafi_ros_interfaces</depend>
 	
-	<exec_depend>olympe_bridge_nodes</exec_depend>
+	<exec_depend>anafi_ros_nodes</exec_depend>
 	
 	<member_of_group>rosidl_interface_packages</member_of_group>
   

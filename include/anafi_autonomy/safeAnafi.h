@@ -24,16 +24,16 @@
 #include <tf2/transform_datatypes.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
-#include <olympe_bridge_interfaces/msg/piloting_command.hpp>
-#include <olympe_bridge_interfaces/msg/move_to_command.hpp>
-#include <olympe_bridge_interfaces/msg/move_by_command.hpp>
-#include <olympe_bridge_interfaces/msg/camera_command.hpp>
-#include <olympe_bridge_interfaces/msg/gimbal_command.hpp>
-#include <olympe_bridge_interfaces/msg/skycontroller_command.hpp>
-#include <olympe_bridge_interfaces/srv/flight_plan.hpp>
-#include <olympe_bridge_interfaces/srv/follow_me.hpp>
-#include <olympe_bridge_interfaces/srv/photo.hpp>
-#include <olympe_bridge_interfaces/srv/recording.hpp>
+#include <anafi_ros_interfaces/msg/piloting_command.hpp>
+#include <anafi_ros_interfaces/msg/move_to_command.hpp>
+#include <anafi_ros_interfaces/msg/move_by_command.hpp>
+#include <anafi_ros_interfaces/msg/camera_command.hpp>
+#include <anafi_ros_interfaces/msg/gimbal_command.hpp>
+#include <anafi_ros_interfaces/msg/skycontroller_command.hpp>
+#include <anafi_ros_interfaces/srv/flight_plan.hpp>
+#include <anafi_ros_interfaces/srv/follow_me.hpp>
+#include <anafi_ros_interfaces/srv/photo.hpp>
+#include <anafi_ros_interfaces/srv/recording.hpp>
 
 #include <anafi_autonomy/msg/reference_command.hpp>
 #include <anafi_autonomy/msg/pose_command.hpp>
@@ -100,7 +100,7 @@ class SafeAnafi : public rclcpp::Node{
 	private:			
 		// Subsribers	
 		rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr action_subscriber;
-		rclcpp::Subscription<olympe_bridge_interfaces::msg::SkycontrollerCommand>::SharedPtr command_skycontroller_subscriber;
+		rclcpp::Subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>::SharedPtr command_skycontroller_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::KeyboardDroneCommand>::SharedPtr command_keyboard_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::KeyboardCameraCommand>::SharedPtr command_camera_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::PoseCommand>::SharedPtr reference_pose_subscriber;
@@ -120,11 +120,11 @@ class SafeAnafi : public rclcpp::Node{
 
 		
 		// Publishers
-		rclcpp::Publisher<olympe_bridge_interfaces::msg::PilotingCommand>::SharedPtr rpyg_publisher;
-		rclcpp::Publisher<olympe_bridge_interfaces::msg::MoveToCommand>::SharedPtr moveto_publisher;
-		rclcpp::Publisher<olympe_bridge_interfaces::msg::MoveByCommand>::SharedPtr moveby_publisher;
-		rclcpp::Publisher<olympe_bridge_interfaces::msg::CameraCommand>::SharedPtr camera_publisher;
-		rclcpp::Publisher<olympe_bridge_interfaces::msg::GimbalCommand>::SharedPtr gimbal_publisher;
+		rclcpp::Publisher<anafi_ros_interfaces::msg::PilotingCommand>::SharedPtr rpyg_publisher;
+		rclcpp::Publisher<anafi_ros_interfaces::msg::MoveToCommand>::SharedPtr moveto_publisher;
+		rclcpp::Publisher<anafi_ros_interfaces::msg::MoveByCommand>::SharedPtr moveby_publisher;
+		rclcpp::Publisher<anafi_ros_interfaces::msg::CameraCommand>::SharedPtr camera_publisher;
+		rclcpp::Publisher<anafi_ros_interfaces::msg::GimbalCommand>::SharedPtr gimbal_publisher;
 		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher;
 		rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr desired_velocity_publisher; // FOR DEBUGGING
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr acceleration_publisher; // FOR DEBUGGING
@@ -137,16 +137,16 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr takeoff_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr land_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr rth_client;
-		rclcpp::Client<olympe_bridge_interfaces::srv::FlightPlan>::SharedPtr flightplan_upload_client;
-		rclcpp::Client<olympe_bridge_interfaces::srv::FlightPlan>::SharedPtr flightplan_start_client;
+		rclcpp::Client<anafi_ros_interfaces::srv::FlightPlan>::SharedPtr flightplan_upload_client;
+		rclcpp::Client<anafi_ros_interfaces::srv::FlightPlan>::SharedPtr flightplan_start_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr flightplan_pause_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr flightplan_stop_client;
-		rclcpp::Client<olympe_bridge_interfaces::srv::FollowMe>::SharedPtr followme_start_client;
+		rclcpp::Client<anafi_ros_interfaces::srv::FollowMe>::SharedPtr followme_start_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr followme_stop_client;
 		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr offboard_client;
-		rclcpp::Client<olympe_bridge_interfaces::srv::Photo>::SharedPtr take_photo_client;
-		rclcpp::Client<olympe_bridge_interfaces::srv::Recording>::SharedPtr start_recording_client;
-		rclcpp::Client<olympe_bridge_interfaces::srv::Recording>::SharedPtr stop_recording_client;
+		rclcpp::Client<anafi_ros_interfaces::srv::Photo>::SharedPtr take_photo_client;
+		rclcpp::Client<anafi_ros_interfaces::srv::Recording>::SharedPtr start_recording_client;
+		rclcpp::Client<anafi_ros_interfaces::srv::Recording>::SharedPtr stop_recording_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reset_zoom_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reset_gimbal_client;
 		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr download_media_client;
@@ -155,14 +155,14 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reboot_client;
 
 		// Messages
-		olympe_bridge_interfaces::msg::PilotingCommand rpyg_msg;
+		anafi_ros_interfaces::msg::PilotingCommand rpyg_msg;
 
 		// Requests
 		std::shared_ptr<std_srvs::srv::Trigger_Request_<std::allocator<void>>> trigger_request;
 		std::shared_ptr<std_srvs::srv::SetBool_Request_<std::allocator<void>>> true_request;
 		std::shared_ptr<std_srvs::srv::SetBool_Request_<std::allocator<void>>> false_request;
-		std::shared_ptr<olympe_bridge_interfaces::srv::Photo_Request_<std::allocator<void>>> photo_request;
-		std::shared_ptr<olympe_bridge_interfaces::srv::Recording_Request_<std::allocator<void>>> recording_request;
+		std::shared_ptr<anafi_ros_interfaces::srv::Photo_Request_<std::allocator<void>>> photo_request;
+		std::shared_ptr<anafi_ros_interfaces::srv::Recording_Request_<std::allocator<void>>> recording_request;
 		
 		// Parameter client
 		rclcpp::AsyncParametersClient::SharedPtr parameters_client;
@@ -277,7 +277,7 @@ class SafeAnafi : public rclcpp::Node{
 		void parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
 		rcl_interfaces::msg::SetParametersResult parameter_callback(const std::vector<rclcpp::Parameter> &parameters);	
 		void actionCallback(const std_msgs::msg::Int8& action_msg);
-		void skycontrollerCallback(const olympe_bridge_interfaces::msg::SkycontrollerCommand& command_msg);
+		void skycontrollerCallback(const anafi_ros_interfaces::msg::SkycontrollerCommand& command_msg);
 		void keyboardCallback(const anafi_autonomy::msg::KeyboardDroneCommand& command_msg);
 		void cameraCallback(const anafi_autonomy::msg::KeyboardCameraCommand& command_msg);
 		void referencePoseCallback(const anafi_autonomy::msg::PoseCommand& command_msg);

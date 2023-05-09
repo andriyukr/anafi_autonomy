@@ -21,7 +21,7 @@ def generate_launch_description():
 
 	anafi_include = IncludeLaunchDescription(
 		PythonLaunchDescriptionSource([
-			os.path.join(get_package_share_directory('olympe_bridge_nodes')), 
+			os.path.join(get_package_share_directory('anafi_ros_nodes')), 
 			'/anafi_launch.py'
 		]),
 		launch_arguments={

@@ -23,7 +23,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 
 	// Subscribers
 	action_subscriber = this->create_subscription<std_msgs::msg::Int8>("keyboard/action", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::actionCallback, this, _1));
-	command_skycontroller_subscriber = this->create_subscription<olympe_bridge_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::skycontrollerCallback, this, _1));
+	command_skycontroller_subscriber = this->create_subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::skycontrollerCallback, this, _1));
 	command_keyboard_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardDroneCommand>("keyboard/drone_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::keyboardCallback, this, _1));
 	command_camera_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardCameraCommand>("keyboard/camera_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::cameraCallback, this, _1));
 	reference_pose_subscriber = this->create_subscription<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referencePoseCallback, this, _1));
@@ -42,11 +42,11 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	pose_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("drone/pose", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::poseCallback, this, _1));
 
 	// Publishers
-	rpyg_publisher = this->create_publisher<olympe_bridge_interfaces::msg::PilotingCommand>("drone/command", rclcpp::SystemDefaultsQoS());
-	moveto_publisher = this->create_publisher<olympe_bridge_interfaces::msg::MoveToCommand>("drone/moveto", rclcpp::SystemDefaultsQoS());
-	moveby_publisher = this->create_publisher<olympe_bridge_interfaces::msg::MoveByCommand>("drone/moveby", rclcpp::SystemDefaultsQoS());
-	camera_publisher = this->create_publisher<olympe_bridge_interfaces::msg::CameraCommand>("camera/command", rclcpp::SystemDefaultsQoS());
-	gimbal_publisher = this->create_publisher<olympe_bridge_interfaces::msg::GimbalCommand>("gimbal/command", rclcpp::SystemDefaultsQoS());
+	rpyg_publisher = this->create_publisher<anafi_ros_interfaces::msg::PilotingCommand>("drone/command", rclcpp::SystemDefaultsQoS());
+	moveto_publisher = this->create_publisher<anafi_ros_interfaces::msg::MoveToCommand>("drone/moveto", rclcpp::SystemDefaultsQoS());
+	moveby_publisher = this->create_publisher<anafi_ros_interfaces::msg::MoveByCommand>("drone/moveby", rclcpp::SystemDefaultsQoS());
+	camera_publisher = this->create_publisher<anafi_ros_interfaces::msg::CameraCommand>("camera/command", rclcpp::SystemDefaultsQoS());
+	gimbal_publisher = this->create_publisher<anafi_ros_interfaces::msg::GimbalCommand>("gimbal/command", rclcpp::SystemDefaultsQoS());
 	odometry_publisher = this->create_publisher<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS());
 	acceleration_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/acceleration", rclcpp::SystemDefaultsQoS());
 	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
@@ -61,26 +61,26 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	reboot_client = this->create_client<std_srvs::srv::Trigger>("drone/reboot");
 	calibrate_magnetometer_client = this->create_client<std_srvs::srv::Trigger>("drone/calibrate");
 	offboard_client = this->create_client<std_srvs::srv::SetBool>("skycontroller/offboard");
-	flightplan_upload_client = this->create_client<olympe_bridge_interfaces::srv::FlightPlan>("flightplan/upload");
-	flightplan_start_client = this->create_client<olympe_bridge_interfaces::srv::FlightPlan>("flightplan/start");
+	flightplan_upload_client = this->create_client<anafi_ros_interfaces::srv::FlightPlan>("flightplan/upload");
+	flightplan_start_client = this->create_client<anafi_ros_interfaces::srv::FlightPlan>("flightplan/start");
 	flightplan_pause_client = this->create_client<std_srvs::srv::Trigger>("flightplan/pause");
 	flightplan_stop_client = this->create_client<std_srvs::srv::Trigger>("flightplan/stop");
-	followme_start_client = this->create_client<olympe_bridge_interfaces::srv::FollowMe>("followme/start");
+	followme_start_client = this->create_client<anafi_ros_interfaces::srv::FollowMe>("followme/start");
 	followme_stop_client = this->create_client<std_srvs::srv::Trigger>("followme/stop");
 	reset_gimbal_client = this->create_client<std_srvs::srv::Trigger>("gimbal/reset");
 	calibrate_gimbal_client = this->create_client<std_srvs::srv::Trigger>("gimbal/calibrate");
 	reset_zoom_client = this->create_client<std_srvs::srv::Trigger>("camera/reset");
-	take_photo_client = this->create_client<olympe_bridge_interfaces::srv::Photo>("camera/photo/take");
-	start_recording_client = this->create_client<olympe_bridge_interfaces::srv::Recording>("camera/recording/start");
-	stop_recording_client = this->create_client<olympe_bridge_interfaces::srv::Recording>("camera/recording/stop");
+	take_photo_client = this->create_client<anafi_ros_interfaces::srv::Photo>("camera/photo/take");
+	start_recording_client = this->create_client<anafi_ros_interfaces::srv::Recording>("camera/recording/start");
+	stop_recording_client = this->create_client<anafi_ros_interfaces::srv::Recording>("camera/recording/stop");
 	download_media_client = this->create_client<std_srvs::srv::SetBool>("storage/download");
 
 	// Static requests
 	trigger_request = std::make_shared<std_srvs::srv::Trigger::Request>();
 	false_request = std::make_shared<std_srvs::srv::SetBool::Request>();
 	true_request = std::make_shared<std_srvs::srv::SetBool::Request>();
-	photo_request = std::make_shared<olympe_bridge_interfaces::srv::Photo::Request>();
-    recording_request = std::make_shared<olympe_bridge_interfaces::srv::Recording::Request>();
+	photo_request = std::make_shared<anafi_ros_interfaces::srv::Photo::Request>();
+    recording_request = std::make_shared<anafi_ros_interfaces::srv::Recording::Request>();
 	false_request->data = false;
 	true_request->data = true;
 
@@ -423,7 +423,7 @@ void SafeAnafi::timer_callback(){
 	                  	(controller_gimbal_command(1) != 0 ? -controller_gimbal_command(1) : (keyboard_gimbal_command(1) != 0 ? keyboard_gimbal_command(1) : offboard_gimbal_command(1))),
 	                  	(controller_gimbal_command(2) != 0 ? -controller_gimbal_command(2) : (keyboard_gimbal_command(2) != 0 ? keyboard_gimbal_command(2) : offboard_gimbal_command(2)));
 
-	olympe_bridge_interfaces::msg::GimbalCommand gimbal_msg;
+	anafi_ros_interfaces::msg::GimbalCommand gimbal_msg;
 	gimbal_msg.header.stamp = this->get_clock()->now();
 	gimbal_msg.header.frame_id = "body";
 	gimbal_msg.mode = 1;
@@ -444,7 +444,7 @@ void SafeAnafi::timer_callback(){
 	// Zoom
 	zoom_command = (controller_zoom_command != 0 ? controller_zoom_command : (keyboard_zoom_command != 0 ? keyboard_zoom_command : offboard_zoom_command));
 
-	olympe_bridge_interfaces::msg::CameraCommand camera_msg;
+	anafi_ros_interfaces::msg::CameraCommand camera_msg;
 	camera_msg.header.stamp = this->get_clock()->now();
 	camera_msg.header.frame_id = "gimbal";
 	camera_msg.mode = 1;
@@ -478,7 +478,7 @@ void SafeAnafi::actionCallback(const std_msgs::msg::Int8& action_msg){
 	action = static_cast<Actions>(action_msg.data);
 }
 
-void SafeAnafi::skycontrollerCallback(const olympe_bridge_interfaces::msg::SkycontrollerCommand& command_msg){
+void SafeAnafi::skycontrollerCallback(const anafi_ros_interfaces::msg::SkycontrollerCommand& command_msg){
 	// Drone commands
 	command_skycontroller << max_horizontal_speed/100*command_msg.x, -max_horizontal_speed/100*command_msg.y, max_vertical_speed/100*command_msg.z, -max_yaw_rate/100*command_msg.yaw;
 	mode_skycontroller << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
@@ -737,7 +737,7 @@ void SafeAnafi::stateMachine(){
 		case MISSION_START:
 			if(mission_type == 0){ // flight plan
 				if(armed){
-					auto flightplan_request = std::make_shared<olympe_bridge_interfaces::srv::FlightPlan::Request>();
+					auto flightplan_request = std::make_shared<anafi_ros_interfaces::srv::FlightPlan::Request>();
 					flightplan_request->file = flightplan_file;
 					flightplan_request->uid = "";
 					flightplan_upload_client->async_send_request(flightplan_request);
@@ -808,14 +808,14 @@ void SafeAnafi::stateMachine(){
 			break;
 		case MISSION_START:
 			if(mission_type == 0){ // flight plan
-				auto flightplan_request = std::make_shared<olympe_bridge_interfaces::srv::FlightPlan::Request>();
+				auto flightplan_request = std::make_shared<anafi_ros_interfaces::srv::FlightPlan::Request>();
 				flightplan_request->file = flightplan_file;
 				flightplan_request->uid = "";
 				flightplan_upload_client->async_send_request(flightplan_request);
 				flightplan_start_client->async_send_request(flightplan_request);
 			}
 			else{ // follow me
-				auto followme_request = std::make_shared<olympe_bridge_interfaces::srv::FollowMe::Request>();
+				auto followme_request = std::make_shared<anafi_ros_interfaces::srv::FollowMe::Request>();
 				followme_request->mode = followme_mode;
 				followme_request->horizontal = 2;
 				followme_request->vertical = 10;
