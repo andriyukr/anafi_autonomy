@@ -17,12 +17,12 @@ This package has been tested with **python3** in **ROS2 Humble**/**Ubuntu 22.04*
 
 ### Dependencies
 
-- [olympe_bridge](https://github.com/andriyukr/olympe_bridge) - ROS bridge for Parrot Olympe SDK
+- [anafi_ros](https://github.com/andriyukr/anafi_ros) - ROS bridge for Parrot Olympe SDK
       
 - (optinal) [xterm](https://invisible-island.net/xterm/xterm.html) - terminal emulator:
 
-    sudo apt-get install xterm
-    
+      sudo apt-get install xterm
+
 ### Clone
 
 To build from source, clone the latest version from this repository into your ROS2 workspace and build the package using:
