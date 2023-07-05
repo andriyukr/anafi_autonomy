@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/qos.hpp>
-#include <std_msgs/msg/int8.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
@@ -99,7 +99,7 @@ class SafeAnafi : public rclcpp::Node{
 
 	private:			
 		// Subsribers	
-		rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr action_subscriber;
+		rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr action_subscriber;
 		rclcpp::Subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>::SharedPtr command_skycontroller_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::KeyboardDroneCommand>::SharedPtr command_keyboard_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::KeyboardCameraCommand>::SharedPtr command_camera_subscriber;
@@ -276,7 +276,7 @@ class SafeAnafi : public rclcpp::Node{
 		void timer_callback();
 		void parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
 		rcl_interfaces::msg::SetParametersResult parameter_callback(const std::vector<rclcpp::Parameter> &parameters);	
-		void actionCallback(const std_msgs::msg::Int8& action_msg);
+		void actionCallback(const std_msgs::msg::UInt8& action_msg);
 		void skycontrollerCallback(const anafi_ros_interfaces::msg::SkycontrollerCommand& command_msg);
 		void keyboardCallback(const anafi_autonomy::msg::KeyboardDroneCommand& command_msg);
 		void cameraCallback(const anafi_autonomy::msg::KeyboardCameraCommand& command_msg);

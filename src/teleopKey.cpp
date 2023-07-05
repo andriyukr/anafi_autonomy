@@ -12,7 +12,7 @@
 #include <pthread.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/qos.hpp>
-#include <std_msgs/msg/int8.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 #include <anafi_autonomy/msg/keyboard_drone_command.hpp>
 #include <anafi_autonomy/msg/keyboard_camera_command.hpp>
 
@@ -94,7 +94,7 @@ class Teleop : public rclcpp::Node{
 				"SPACE \t - halt \n"
 				"r \t - reset pose \n";
 		
-			action_publisher = this->create_publisher<std_msgs::msg::Int8>("keyboard/action", rclcpp::SystemDefaultsQoS());
+			action_publisher = this->create_publisher<std_msgs::msg::UInt8>("keyboard/action", rclcpp::SystemDefaultsQoS());
 			drone_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardDroneCommand>("keyboard/drone_command", rclcpp::SystemDefaultsQoS());
 			camera_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardCameraCommand>("keyboard/camera_command", rclcpp::SystemDefaultsQoS());
 						
@@ -106,12 +106,12 @@ class Teleop : public rclcpp::Node{
 		rclcpp::TimerBase::SharedPtr timer;
 	
 		// Publishers
-		rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr action_publisher;
+		rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr action_publisher;
 		rclcpp::Publisher<anafi_autonomy::msg::KeyboardDroneCommand>::SharedPtr drone_publisher;
 		rclcpp::Publisher<anafi_autonomy::msg::KeyboardCameraCommand>::SharedPtr camera_publisher;
 
 		// Messages
-		std_msgs::msg::Int8 action;
+		std_msgs::msg::UInt8 action;
 
 		// Callback
 		void timer_callback(){
