@@ -1,5 +1,5 @@
 # ROS2 Package for Parrot Anafi Drones Navigation
-This ROS2 package contains interface to control drones from Parrot Anafi family (4K, Thermal, USA, AI, Sphinx).
+This ROS2 package contains an interface to control drones from the Parrot Anafi family (4K, Thermal, USA, AI, Sphinx).
 
 ## Overview
 
@@ -19,7 +19,7 @@ This package has been tested with **python3** in **ROS2 Humble**/**Ubuntu 22.04*
 
 - [anafi_ros](https://github.com/andriyukr/anafi_ros) - ROS bridge for Parrot Olympe SDK
       
-- (optinal) [xterm](https://invisible-island.net/xterm/xterm.html) - terminal emulator:
+- (optional) [xterm](https://invisible-island.net/xterm/xterm.html) - terminal emulator:
 
       sudo apt-get install xterm
 
@@ -37,7 +37,7 @@ To build from source, clone the latest version from this repository into your RO
 
 ### Method 1 (without xterm):
 
-To control to the drone, in the terminal 1, run:
+To control the drone, in the terminal 1, run:
 
     ros2 launch anafi_autonomy safe_anafi_launch.py
 
@@ -49,8 +49,10 @@ The commands can be keyed in terminal 2.
     
 ### Method 2 (with xterm):
 
-To control to the drone, in the terminal, run:
+To control the drone, in the terminal, run:
 
     ros2 launch anafi_autonomy control_anafi_launch.py
     
-A new window will pop-up where commands can be keyed in. 
+A new window will pop up where commands can be keyed in.
+
+https://github.com/andriyukr/anafi_autonomy/assets/5682865/d29c227a-b389-4c62-a23b-3e2a12b1a5fe
