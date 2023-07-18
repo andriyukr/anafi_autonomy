@@ -3,15 +3,13 @@
  * This node collects all the messages:
  *	  - Feedback from the UAV: state estimates for odometry
  *	  - Reference trajectory: desired position and velocity from the trajectory generator
- *	  - UAV commands: position, velocity and attitude commands from PID or ANN/FNN-PD
+ *	  - UAV commands: position, velocity and attitude commands from PID
  *	  - Keyboard input commands: commands from user by keyboard input
  *	  - Constraints and safety: contains constraints and safety bounds for commands
  *	  - Controller: lets the user choose between position/velocity/attitude commands
  *
  * TODO's:
- *	  - Check velocities frame
  *	  - Tune velocity controller
- *	  - Filter accelerations
  *
  * *********************************************************************/
 
@@ -29,7 +27,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	reference_pose_subscriber = this->create_subscription<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referencePoseCallback, this, _1));
 	reference_velocity_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/reference_velocity", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceVelocityCallback, this, _1));
 	reference_attitude_subscriber = this->create_subscription<anafi_autonomy::msg::AttitudeCommand>("drone/reference_attitude", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceAttitudeCallback, this, _1));
-    reference_command_subscriber = this->create_subscription<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceCommandCallback, this, _1));
+	reference_command_subscriber = this->create_subscription<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceCommandCallback, this, _1));
 	derivative_command_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/derivative_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::derivativeCommandCallback, this, _1));
 	reference_gimbal_subscriber = this->create_subscription<geometry_msgs::msg::Vector3>("drone/reference_gimbal", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceGimbalCallback, this, _1));
 	reference_zoom_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/reference_zoom", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceZoomCallback, this, _1));
@@ -48,7 +46,8 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	camera_publisher = this->create_publisher<anafi_ros_interfaces::msg::CameraCommand>("camera/command", rclcpp::SystemDefaultsQoS());
 	gimbal_publisher = this->create_publisher<anafi_ros_interfaces::msg::GimbalCommand>("gimbal/command", rclcpp::SystemDefaultsQoS());
 	odometry_publisher = this->create_publisher<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS());
-	acceleration_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/acceleration", rclcpp::SystemDefaultsQoS());
+	acceleration_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/linear_acceleration", rclcpp::SystemDefaultsQoS());
+	rate_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/angular_velocity", rclcpp::SystemDefaultsQoS());
 	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
 
 	// Services
@@ -90,6 +89,10 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	rcl_interfaces::msg::ParameterDescriptor parameter_descriptor;
 	rcl_interfaces::msg::IntegerRange integer_range;
 	rcl_interfaces::msg::FloatingPointRange floating_point_range;
+	
+	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
+	parameter_descriptor.description = "The drone is armed";
+	this->declare_parameter("armed", false, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor();
 	parameter_descriptor.description = "Enable hand launched takeoff";
@@ -260,12 +263,6 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	// Timer
 	timer = this->create_wall_timer(10ms, std::bind(&SafeAnafi::timer_callback, this));
 
-	// Initialise the set of velocities
-	geometry_msgs::msg::Twist t;
-	velocities.clear();
-	for(int i = 0; i < FILTER_SIZE; ++i)
-		velocities.push_back(t);
-
 	// Parameters client
 	auto parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(this, "anafi");
 	param_events_subscriber = parameters_client->on_parameter_event(std::bind(&SafeAnafi::parameter_events_callback, this, std::placeholders::_1));
@@ -276,6 +273,9 @@ rcl_interfaces::msg::SetParametersResult SafeAnafi::parameter_callback(const std
 	result.successful = true;
 
 	for(auto &parameter:parameters){
+		if(parameter.get_name() == "armed"){
+			return result;
+		}
 		if(parameter.get_name() == "hand_launch"){
 			hand_launch = parameter.as_bool();
 			RCLCPP_DEBUG(this->get_logger(), "Parameter 'hand_launch' set to %s", hand_launch ? "true" : "false");
@@ -459,12 +459,19 @@ void SafeAnafi::timer_callback(){
 			stop_zoom = true;
 		}
 
-	geometry_msgs::msg::Vector3Stamped acceleration_msg; // FOR DEBUG
-	acceleration_msg.header.stamp = this->get_clock()->now(); // FOR DEBUG
-	acceleration_msg.vector.x = acceleration(0); // FOR DEBUG
-	acceleration_msg.vector.y = acceleration(1); // FOR DEBUG
-	acceleration_msg.vector.z = acceleration(2); // FOR DEBUG
-	acceleration_publisher->publish(acceleration_msg); // FOR DEBUG
+	geometry_msgs::msg::Vector3Stamped acceleration_msg;
+	acceleration_msg.header.stamp = this->get_clock()->now();
+	acceleration_msg.vector.x = acceleration(0);
+	acceleration_msg.vector.y = acceleration(1);
+	acceleration_msg.vector.z = acceleration(2);
+	acceleration_publisher->publish(acceleration_msg);
+	
+	geometry_msgs::msg::Vector3Stamped rate_msg;
+	rate_msg.header.stamp = this->get_clock()->now();
+	rate_msg.vector.x = rates(0);
+	rate_msg.vector.y = rates(1);
+	rate_msg.vector.z = rates(2);
+	rate_publisher->publish(rate_msg);
 		
 	geometry_msgs::msg::Vector3Stamped mode_msg; // FOR DEBUG
 	mode_msg.header.stamp = this->get_clock()->now(); // FOR DEBUG
@@ -576,7 +583,12 @@ void SafeAnafi::gpsCallback(__attribute__((unused)) const sensor_msgs::msg::NavS
 
 void SafeAnafi::altitudeCallback(const std_msgs::msg::Float32& altitude_msg){
 	if(pose_available <= 0 && odometry_available <= 0){
+		time = rclcpp::Time(this->get_clock()->now().seconds(), this->get_clock()->now().nanoseconds());
+		d_t_altitude = (time - time_old_attitude).nanoseconds()/1e9;
+
         position(2) = altitude_msg.data;
+
+		time_old_attitude = time;
 
         altitude_available = 10;
 	}
@@ -585,23 +597,20 @@ void SafeAnafi::altitudeCallback(const std_msgs::msg::Float32& altitude_msg){
 void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg){
     if(pose_available <= 0 && odometry_available <= 0){
         time = rclcpp::Time(quaternion_msg.header.stamp.sec, quaternion_msg.header.stamp.nanosec);
-        dt = (time - time_old_attitude).nanoseconds()/1e9;
+        double d_t = (time - time_old_attitude).nanoseconds()/1e9;
 
         tf2::Quaternion q(quaternion_msg.quaternion.x, quaternion_msg.quaternion.y, quaternion_msg.quaternion.z, quaternion_msg.quaternion.w);
         tf2::Matrix3x3 m(q);
         double roll, pitch;
         m.getRPY(roll, pitch, yaw);
-
-        geometry_msgs::msg::Twist t;
-        t.angular.x = (roll - orientation(0))/dt;
-        t.angular.y = (pitch - orientation(1))/dt;
-        t.angular.z = (yaw - orientation(2))/dt;
-        t = filter_mean_velocities(t);
+		yaw = denormalizeAngle(yaw, orientation(2));
 
         orientation << roll, pitch, yaw;
-        rates << t.angular.x, t.angular.y, t.angular.z;
+		
+		nd_orientation.updateMeasurements(orientation, d_t);
+		rates = nd_orientation.getDerivative();
 
-        time_old_attitude = time;
+		time_old_attitude = time;
 
         attitude_available = 10;
     }
@@ -610,14 +619,13 @@ void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& qu
 void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg){
     if(odometry_available <= 0){
         time = rclcpp::Time(speed_msg.header.stamp.sec, speed_msg.header.stamp.nanosec);
-        dt = (time - time_old_speed).nanoseconds()/1e9;
+        double d_t = (time - time_old_speed).nanoseconds()/1e9;
 
         velocity << speed_msg.vector.x, speed_msg.vector.y, speed_msg.vector.z;
 
-        acceleration << (velocity - velocity_old)/dt;
-        acceleration = filter_mean_acceleration(acceleration);
+		nd_velocity.updateMeasurements(velocity, d_t);
+		acceleration = nd_velocity.getDerivative();
 
-        velocity_old = velocity;
         time_old_speed = time;
 
         velocity_available = 10;
@@ -626,46 +634,48 @@ void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_ms
 
 void SafeAnafi::poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	time = rclcpp::Time(pose_msg.header.stamp.sec, pose_msg.header.stamp.nanosec);
-	dt = (time - time_old_pose).nanoseconds()/1e9;
+	double d_t = (time - time_old_pose).nanoseconds()/1e9;
+	d_t_altitude = d_t;
 	
-	nav_msgs::msg::Odometry odometry_msg;
-	odometry_msg.header.stamp = pose_msg.header.stamp;
-	odometry_msg.header.frame_id = pose_msg.header.frame_id;
-	odometry_msg.child_frame_id = "/body";
-
-	odometry_msg.pose.pose.position.x = pose_msg.pose.position.x;
-	odometry_msg.pose.pose.position.y = pose_msg.pose.position.y;
-	odometry_msg.pose.pose.position.z = pose_msg.pose.position.z;
-
 	tf2::Quaternion q(pose_msg.pose.orientation.x, pose_msg.pose.orientation.y, pose_msg.pose.orientation.z, pose_msg.pose.orientation.w);
 	tf2::Matrix3x3 m(q);
 	double roll, pitch;
 	m.getRPY(roll, pitch, yaw);
-	odometry_msg.pose.pose.orientation = pose_msg.pose.orientation;
-
-	geometry_msgs::msg::Twist t;
-	t.linear.x = (odometry_msg.pose.pose.position.x - position(0))/dt;
-	t.linear.y = (odometry_msg.pose.pose.position.y - position(1))/dt;
-	t.linear.z = (odometry_msg.pose.pose.position.z - position(2))/dt;
-	t.angular.x = (roll - orientation(0))/dt;
-	t.angular.y = (pitch - orientation(1))/dt;
-	t.angular.z = (yaw - orientation(2))/dt;
-	odometry_msg.twist.twist = filter_mean_velocities(t);
-	odometry_publisher->publish(odometry_msg);
-
-	position << odometry_msg.pose.pose.position.x, odometry_msg.pose.pose.position.y, odometry_msg.pose.pose.position.z;
+	yaw = denormalizeAngle(yaw, orientation(2));
+	
+	position << pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z;
 	orientation << roll, pitch, yaw;
-	velocity << odometry_msg.twist.twist.linear.x, odometry_msg.twist.twist.linear.y, odometry_msg.twist.twist.linear.z;
-	rates << odometry_msg.twist.twist.angular.x, odometry_msg.twist.twist.angular.y, odometry_msg.twist.twist.angular.z;
+		
+	nd_position.updateMeasurements(position, d_t);
+	velocity = nd_position.getDerivative();
+	
+	nd_orientation.updateMeasurements(orientation, d_t);
+	rates = nd_orientation.getDerivative();
 
 	time_old_pose = time;
 
 	pose_available = 30;
+
+	nav_msgs::msg::Odometry odometry_msg;
+	odometry_msg.header.stamp = pose_msg.header.stamp;
+	odometry_msg.header.frame_id = pose_msg.header.frame_id;
+	odometry_msg.child_frame_id = "/body";
+	odometry_msg.pose.pose.position = pose_msg.pose.position;
+	odometry_msg.pose.pose.orientation = pose_msg.pose.orientation;
+	geometry_msgs::msg::Twist t;
+	t.linear.x = velocity(0);
+	t.linear.y = velocity(1);
+	t.linear.z = velocity(2);
+	t.angular.x = rates(0);
+	t.angular.y = rates(1);
+	t.angular.z = rates(2);
+	odometry_publisher->publish(odometry_msg);
 }
 
 void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
 	time = rclcpp::Time(odometry_msg.header.stamp.sec, odometry_msg.header.stamp.nanosec);
-	dt = (time - time_old_odometry).nanoseconds()/1e9;
+	double d_t = (time - time_old_odometry).nanoseconds()/1e9;
+	d_t_altitude = d_t;
 
 	position << odometry_msg.pose.pose.position.x, odometry_msg.pose.pose.position.y, odometry_msg.pose.pose.position.z;
 
@@ -679,20 +689,19 @@ void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
 
 	velocity << odometry_msg.twist.twist.linear.x, odometry_msg.twist.twist.linear.y, odometry_msg.twist.twist.linear.z;
 
-	acceleration << (velocity - velocity_old)/dt;
-	acceleration = filter_mean_acceleration(acceleration);
+	nd_velocity.updateMeasurements(velocity, d_t);
+	acceleration = nd_velocity.getDerivative();
 
-	velocity_old = velocity;
 	time_old_odometry = time;
 
 	odometry_available = 40;
 }
 
 void SafeAnafi::stateMachine(){
-	// State-indipendent actions
-	switch(action){
+	switch(action){ // State-indipendent actions
 	case DISARM: // emergency
 		emergency_client->async_send_request(trigger_request);
+		this->set_parameter(rclcpp::Parameter("armed", false));
 		return;
 	case RESET_POSE:
 		RCLCPP_INFO(this->get_logger(), "Resetting position and heading");
@@ -717,22 +726,25 @@ void SafeAnafi::stateMachine(){
 	    controllers(); // ONLY FOR GROUND TEST DEBUG
 		switch(action){
 		case ARM:
-		    if(hand_launch)
+			if(hand_launch){
 				arm_client->async_send_request(true_request);
+				armed = true;
+				this->set_parameter(rclcpp::Parameter("armed", true));
+			}
 			else{
 				armed = !armed;
 				if(armed)
 					RCLCPP_WARN(this->get_logger(), "Armed");
 				else
 					RCLCPP_INFO(this->get_logger(), "Disarmed");
-			}
+				this->set_parameter(rclcpp::Parameter("armed", armed));
+			}			
 			break;
 		case TAKEOFF:
 			if(armed)
 				takeoff_client->async_send_request(trigger_request);
 			else
 				RCLCPP_WARN(this->get_logger(), "Arm the drone with 'Insert' before taking-off.");
-			armed = false;
 			break;
 		case MISSION_START:
 			if(mission_type == 0){ // flight plan
@@ -745,7 +757,6 @@ void SafeAnafi::stateMachine(){
 				}
 				else
 					RCLCPP_WARN(this->get_logger(), "Arm the drone with 'Insert' before starting the mission.");
-				armed = false;
 			}
 			else
 				RCLCPP_WARN(this->get_logger(), "The drone has to be in the air.");
@@ -766,6 +777,8 @@ void SafeAnafi::stateMachine(){
 		case LAND:
 		case HALT:
 			arm_client->async_send_request(false_request);
+			armed = false;
+			this->set_parameter(rclcpp::Parameter("armed", false));
 			break;
 		default:
 			break;
@@ -777,6 +790,8 @@ void SafeAnafi::stateMachine(){
 		case LAND:
 		case HALT:
 			arm_client->async_send_request(false_request);
+			armed = false;
+			this->set_parameter(rclcpp::Parameter("armed", false));
 			break;
 		case TAKEOFF:
 			arm_client->async_send_request(false_request); // needs to stop the motors before taking off
@@ -802,6 +817,8 @@ void SafeAnafi::stateMachine(){
 		switch(action){
 		case LAND:
 			land_client->async_send_request(trigger_request);
+			armed = false;
+			this->set_parameter(rclcpp::Parameter("armed", false));
 			break;
 		case RTH: // return-to-home
 			rth_client->async_send_request(trigger_request);
@@ -849,6 +866,8 @@ void SafeAnafi::stateMachine(){
 		case TAKEOFF:
 		case HALT:
 			takeoff_client->async_send_request(trigger_request);
+			armed = true;
+			this->set_parameter(rclcpp::Parameter("armed", true));
 			break;
 		default:
 			if(landing_control)
@@ -860,6 +879,8 @@ void SafeAnafi::stateMachine(){
 		case TAKEOFF:
 		case HALT:
 			takeoff_client->async_send_request(trigger_request);
+			armed = false;
+			this->set_parameter(rclcpp::Parameter("armed", false));
 			break;
 		default:
 			break;
@@ -972,7 +993,7 @@ void SafeAnafi::controllers(){
             command_move(2) = BOUND(command_move(2), bounds(2,0), bounds(2,1));
             position_error(2) = command_move(2) - position(2);
             position_error_d(2) = derivative_command(2) - velocity(2);
-            position_error_i(2) = BOUND(position_error_i(2) + position_error(2)*dt, max_i_position);
+            position_error_i(2) = BOUND(position_error_i(2) + position_error(2)*d_t_altitude, max_i_position);
             command_move(2) = k_p_position*position_error(2) + k_i_position*position_error_i(2) + k_d_position*position_error_d(2);
 		}else{
 		    rpyg_msg.gaz = 0;
@@ -1026,38 +1047,8 @@ void SafeAnafi::controllers(){
 	rpyg_publisher->publish(rpyg_msg);
 }
 
-geometry_msgs::msg::Twist SafeAnafi::filter_mean_velocities(geometry_msgs::msg::Twist v){
-	velocities.erase(velocities.begin());
-	velocities.push_back(v);
-
-	geometry_msgs::msg::Twist t;
-	for(vector<geometry_msgs::msg::Twist>::iterator i = velocities.begin(); i != velocities.end(); ++i){
-		t.linear.x += i->linear.x/FILTER_SIZE;
-		t.linear.y += i->linear.y/FILTER_SIZE;
-		t.linear.z += i->linear.z/FILTER_SIZE;
-		t.angular.x += i->angular.x/FILTER_SIZE;
-		t.angular.y += i->angular.y/FILTER_SIZE;
-		t.angular.z += i->angular.z/FILTER_SIZE;
-	}
-	return t;
-}
-
-Vector3d SafeAnafi::filter_mean_acceleration(Eigen::Ref<Eigen::VectorXd> a){
-	accelerations.topRows(FILTER_SIZE - 1) = accelerations.bottomRows(FILTER_SIZE - 1);
-	accelerations.row(FILTER_SIZE - 1) = a;
-
-	return accelerations.colwise().sum()/FILTER_SIZE;
-}
-
-Vector3d SafeAnafi::filter_polinomial_acceleration(Eigen::Ref<Eigen::VectorXd> a){
-	accelerations.topRows(FILTER_SIZE - 1) = accelerations.bottomRows(FILTER_SIZE - 1);
-	accelerations.row(FILTER_SIZE - 1) = a;
-
-	return accelerations.bottomRows(1);
-}
-
 double SafeAnafi::denormalizeAngle(double a1, double a2){
-	if(abs(a1 - a2) > M_PI)
+	while(abs(a1 - a2) > M_PI)
 		a1 += (a1 < a2) ? 2*M_PI : -2*M_PI;
 	return a1;
 }

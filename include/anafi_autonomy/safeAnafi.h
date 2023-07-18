@@ -24,6 +24,7 @@
 #include <tf2/transform_datatypes.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
+#include "anafi_autonomy/numericalDerivative.h"
 #include <anafi_ros_interfaces/msg/piloting_command.hpp>
 #include <anafi_ros_interfaces/msg/move_to_command.hpp>
 #include <anafi_ros_interfaces/msg/move_by_command.hpp>
@@ -42,7 +43,6 @@
 #include <anafi_autonomy/msg/keyboard_drone_command.hpp>
 #include <anafi_autonomy/msg/keyboard_camera_command.hpp>
 
-#define FILTER_SIZE 		3
 #define COMMAND_NONE 		0
 #define COMMAND_POSITION 	1
 #define COMMAND_VELOCITY 	2
@@ -51,6 +51,8 @@
 #define MODE_HORIZONTAL 	0
 #define MODE_VERTICAL 		1
 #define MODE_HEADING 		2
+#define FILTER_SIZE 		3
+#define DERIVATIVE_ACCURACY 	3
 
 #define BOUND3(x, min_x, max_x) (x > max_x ? max_x : (x < min_x ? min_x : x))
 #define BOUND2(x, min_max) BOUND3(x, -min_max, min_max)
@@ -126,9 +128,10 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Publisher<anafi_ros_interfaces::msg::CameraCommand>::SharedPtr camera_publisher;
 		rclcpp::Publisher<anafi_ros_interfaces::msg::GimbalCommand>::SharedPtr gimbal_publisher;
 		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher;
-		rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr desired_velocity_publisher; // FOR DEBUGGING
-		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr acceleration_publisher; // FOR DEBUGGING
-		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr mode_publisher; // FOR DEBUGGING
+		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr acceleration_publisher;
+		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr rate_publisher;
+		rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr desired_velocity_publisher; // FOR DEBUG
+		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr mode_publisher; // FOR DEBUG
 		
 		// Clients
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr emergency_client;
@@ -213,14 +216,13 @@ class SafeAnafi : public rclcpp::Node{
 		Vector3d velocity_error_i = Vector3d::Zero();
 		Vector3d velocity_error_d = Vector3d::Zero();
 		Vector3d velocity = Vector3d::Zero();
-		Vector3d velocity_old = Vector3d::Zero();
 		Vector3d velocity_d = Vector3d::Zero();
-		vector<geometry_msgs::msg::Twist> velocities;
+		
+		// Rates
 		Vector3d rates = Vector3d::Zero();
 
 		// Acceleration
 		Vector3d acceleration = Vector3d::Zero();
-		MatrixXd accelerations = MatrixXd::Zero(FILTER_SIZE, 3);
 
 		// Commands
 		Vector4d move_command = Vector4d::Zero();
@@ -267,10 +269,16 @@ class SafeAnafi : public rclcpp::Node{
 		// Time
 		rclcpp::Time time;
 		rclcpp::Time time_old_attitude;
+		rclcpp::Time time_old_altitude;
 		rclcpp::Time time_old_speed;
 		rclcpp::Time time_old_pose;
 		rclcpp::Time time_old_odometry;
-		double dt = DBL_MAX;
+		double d_t_altitude = DBL_MAX;
+		
+		// Numeriacal derivatives
+		NumericalDerivative nd_position = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
+		NumericalDerivative nd_orientation = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
+		NumericalDerivative nd_velocity = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
 		
 		// Callbacks
 		void timer_callback();
@@ -300,8 +308,5 @@ class SafeAnafi : public rclcpp::Node{
 		void parameter_assign(rcl_interfaces::msg::Parameter &parameter);
 		States resolveState(std::string input);
 		void controllers();
-		geometry_msgs::msg::Twist filter_mean_velocities(geometry_msgs::msg::Twist v);
-		Eigen::Vector3d filter_mean_acceleration(Eigen::Ref<Eigen::VectorXd> a);
-		Eigen::Vector3d filter_polinomial_acceleration(Eigen::Ref<Eigen::VectorXd> a);
 		double denormalizeAngle(double a1, double a2);
 };
