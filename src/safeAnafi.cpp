@@ -1003,6 +1003,16 @@ void SafeAnafi::controllers(){
 		[[fallthrough]];
 	case COMMAND_VELOCITY: // velocity
 		command_move(2) = BOUND(command_move(2), max_vertical_speed);
+		if(altitude_available > 0 || pose_available > 0 || odometry_available > 0){ // bound velocity to stay in the safe area
+			if(position(2) <= bounds(2,0) && command_move(2) < 0){
+				command_move(2) = 0;
+				RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *get_clock(), 10000, "The drone is below the minimum altitude (" << bounds(2,0) << "m).");
+			}
+			if(position(2) >= bounds(2,1) && command_move(2) > 0){
+				command_move(2) = 0;
+				RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *get_clock(), 10000, "The drone is above the maximum altitude (" << bounds(2,0) << "m).");
+			}
+		}
 		rpyg_msg.gaz = command_move(2);
 		break;
 	default:

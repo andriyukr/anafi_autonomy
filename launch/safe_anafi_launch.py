@@ -1,10 +1,10 @@
 # Usage: 
 # 	- connection through Skycontroiller [recommended]:
-# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.53.1'
+# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.53.1' model:='ai'
 #	- direct connection to Anafi:
-# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.42.1'
+# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.42.1' model:='ai'
 #	- connection to the simulated drone in Sphinx:
-# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='10.202.0.1'
+# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='10.202.0.1' model:='ai'
 
 import os
 
@@ -19,13 +19,17 @@ from launch_ros.actions import Node
 def generate_launch_description():
 	# args that can be set from the command line or a default will be used
 	namespace_arg = DeclareLaunchArgument(
-		"namespace", 
-		default_value="anafi", 
-		description="Namespace for this Anafi")
+		'namespace', 
+		default_value='anafi', 
+		description='Namespace for this drone')
 	ip_arg = DeclareLaunchArgument(
-		"ip", 
-		default_value="192.168.53.1",  # Anafi: '192.168.42.1', SkyController: '192.168.53.1', Sphinx: '10.202.0.1'
-		description="IP address of the device")
+		'ip', 
+		default_value='192.168.53.1',  # Anafi: '192.168.42.1', SkyController: '192.168.53.1', Sphinx: '10.202.0.1'
+		description='IP address of the device')
+	model_arg = DeclareLaunchArgument(
+		'model', 
+		default_value='ai',  # {'4k', 'thermal', 'usa', 'ai'}
+		description='Model of the drone')
 
 	anafi_include = IncludeLaunchDescription(
 		PythonLaunchDescriptionSource([
@@ -33,7 +37,7 @@ def generate_launch_description():
 			'/anafi_launch.py'
 		]),
 		launch_arguments={
-			'drone/model': '',
+			'drone/model': LaunchConfiguration('model'),
 			'device/ip': LaunchConfiguration('ip')
 		}.items()
 	)
@@ -94,6 +98,7 @@ def generate_launch_description():
 	return LaunchDescription([
 		namespace_arg,
 		ip_arg,
+		model_arg,
 		anafi_include,
 		safe_anafi_node,
 		trajectory_node,
