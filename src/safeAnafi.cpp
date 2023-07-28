@@ -458,21 +458,7 @@ void SafeAnafi::timer_callback(){
 			camera_publisher->publish(camera_msg);
 			stop_zoom = true;
 		}
-
-	geometry_msgs::msg::Vector3Stamped acceleration_msg;
-	acceleration_msg.header.stamp = this->get_clock()->now();
-	acceleration_msg.vector.x = acceleration(0);
-	acceleration_msg.vector.y = acceleration(1);
-	acceleration_msg.vector.z = acceleration(2);
-	acceleration_publisher->publish(acceleration_msg);
-	
-	geometry_msgs::msg::Vector3Stamped rate_msg;
-	rate_msg.header.stamp = this->get_clock()->now();
-	rate_msg.vector.x = rates(0);
-	rate_msg.vector.y = rates(1);
-	rate_msg.vector.z = rates(2);
-	rate_publisher->publish(rate_msg);
-		
+			
 	geometry_msgs::msg::Vector3Stamped mode_msg; // FOR DEBUG
 	mode_msg.header.stamp = this->get_clock()->now(); // FOR DEBUG
 	mode_msg.vector.x = mode_move(0); // FOR DEBUG
@@ -610,6 +596,13 @@ void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& qu
 		nd_orientation.updateMeasurements(orientation, d_t);
 		rates = nd_orientation.getDerivative();
 
+		geometry_msgs::msg::Vector3Stamped rate_msg;
+		rate_msg.header = quaternion_msg.header;
+		rate_msg.vector.x = rates(0);
+		rate_msg.vector.y = rates(1);
+		rate_msg.vector.z = rates(2);
+		rate_publisher->publish(rate_msg);
+
 		time_old_attitude = time;
 
         attitude_available = 10;
@@ -625,6 +618,13 @@ void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_ms
 
 		nd_velocity.updateMeasurements(velocity, d_t);
 		acceleration = nd_velocity.getDerivative();
+
+		geometry_msgs::msg::Vector3Stamped acceleration_msg;
+		acceleration_msg.header = speed_msg.header;
+		acceleration_msg.vector.x = acceleration(0);
+		acceleration_msg.vector.y = acceleration(1);
+		acceleration_msg.vector.z = acceleration(2);
+		acceleration_publisher->publish(acceleration_msg);
 
         time_old_speed = time;
 
@@ -652,14 +652,8 @@ void SafeAnafi::poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	nd_orientation.updateMeasurements(orientation, d_t);
 	rates = nd_orientation.getDerivative();
 
-	time_old_pose = time;
-
-	pose_available = 30;
-
 	nav_msgs::msg::Odometry odometry_msg;
-	odometry_msg.header.stamp = pose_msg.header.stamp;
-	odometry_msg.header.frame_id = pose_msg.header.frame_id;
-	odometry_msg.child_frame_id = "/body";
+	odometry_msg.header = pose_msg.header;
 	odometry_msg.pose.pose.position = pose_msg.pose.position;
 	odometry_msg.pose.pose.orientation = pose_msg.pose.orientation;
 	geometry_msgs::msg::Twist t;
@@ -670,6 +664,10 @@ void SafeAnafi::poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	t.angular.y = rates(1);
 	t.angular.z = rates(2);
 	odometry_publisher->publish(odometry_msg);
+
+	time_old_pose = time;
+
+	pose_available = 30;
 }
 
 void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
