@@ -55,4 +55,8 @@ To control the drone, in the terminal, run:
     
 A new window will pop up where commands can be keyed in.
 
+### Demonstration Video
+
 https://github.com/andriyukr/anafi_autonomy/assets/5682865/d29c227a-b389-4c62-a23b-3e2a12b1a5fe
+
+> :warning: To pilot the drone using the keyboard, you must switch to offboard mode. To switch to offboard mode, <ins>press F2 in the action terminal</ins> or <ins>press the zoom reset button on the Skycontroller</ins>.
