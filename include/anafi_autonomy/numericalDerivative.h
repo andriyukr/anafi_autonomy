@@ -20,7 +20,8 @@ class NumericalDerivative{
 		
 			measurements = MatrixXd::Zero(size, dimension);
 			d_measurements = MatrixXd::Zero(size, dimension);
-			d_ts = DBL_MAX * VectorXd::Ones(size);
+			d_times = DBL_MAX * VectorXd::Ones(size);
+			time_old = 0;
 
 			finiteDifferenceCoefficients.row(0) << 0, 0, 0, FINITE_DIFFERENCE_COEFFICIENTS_2POINTS;
 			finiteDifferenceCoefficients.row(1) << 0, 0, FINITE_DIFFERENCE_COEFFICIENTS_3POINTS;
@@ -29,27 +30,25 @@ class NumericalDerivative{
 		}
 		
 		// Functions
-		void updateMeasurements(Ref<VectorXd> measurement, double d_t){
+		void updateMeasurements(Ref<VectorXd> m, double t){
 			measurements.topRows(size - 1) = measurements.bottomRows(size - 1);
-			measurements.row(size - 1) = measurement;
+			measurements.row(size - 1) = m;
+			
+			d_times.topRows(size - 1) = d_times.bottomRows(size - 1);
+			d_times(size - 1) = t - time_old;
+			time_old = t;
 
 			d_measurements.topRows(size - 1) = d_measurements.bottomRows(size - 1);
-			//d_measurements.row(size - 1) = (measurements.row(size - 1) - measurements.row(size - 2)) / d_t;
 			d_measurements.row(size - 1) = 
-				(finiteDifferenceCoefficients.row(size - 2).tail(size) * measurements).array() 
-					/ d_ts.transpose().array();
-			
-			d_ts.topRows(size - 1) = d_ts.bottomRows(size - 1);
-			d_ts(size - 1) = d_t;
+				finiteDifferenceCoefficients.row(size - 2).tail(size) * measurements / d_times.mean();
 		}
 
 		VectorXd getDerivative(){
-			/*VectorXd derivative = VectorXd(dimension);		
-			derivative = 
-				(finiteDifferenceCoefficients.row(size - 2).tail(size) * measurements).array() 
-					/ d_ts.transpose().array();
-			return derivative;*/
 			return d_measurements.colwise().mean();
+		}
+
+		VectorXd getUnfiltertedDerivative(){
+			return (measurements.row(size - 1) - measurements.row(size - 2))/d_times(size - 1);
 		}
 
 	private:			
@@ -58,8 +57,54 @@ class NumericalDerivative{
 		int dimension;
 		MatrixXd measurements;
 		MatrixXd d_measurements;
-		VectorXd d_ts;
+		VectorXd d_times;
+		double time_old;
 		
 		// Constant
 		MatrixXd finiteDifferenceCoefficients = MatrixXd::Zero(5, 5);
+};
+
+class NumericalDerivativeQuaternion{
+	public:
+		// Constructor
+		NumericalDerivativeQuaternion(){
+			quaternion_old = Quaterniond(1, 0, 0, 0);
+			quaternion_new = Quaterniond(1, 0, 0, 0);
+			time_old = 0;
+			time_new = DBL_MAX;
+		}
+		
+		// Functions
+		void updateQuaternion(Quaterniond q, double t){
+			quaternion_old = quaternion_new;
+			quaternion_new = q;
+			
+			time_old = time_new;
+			time_new = t;
+		}
+
+		
+		Vector3d getAngularVelocity(){
+			Vector3d angular_velocity;
+
+			double dt = time_new - time_old;
+			q1 << quaternion_old.w(), quaternion_old.x(), quaternion_old.y(), quaternion_old.z();
+			q2 << quaternion_new.w(), quaternion_new.x(), quaternion_new.y(), quaternion_new.z();
+
+			// https://mariogc.com/post/angular-velocity-quaternions/
+        	angular_velocity(0) = 2.0/dt*(q1(0)*q2(1) - q1(1)*q2(0) - q1(2)*q2(3) + q1(3)*q2(2));
+			angular_velocity(1) = 2.0/dt*(q1(0)*q2(2) + q1(1)*q2(3) - q1(2)*q2(0) - q1(3)*q2(1));
+			angular_velocity(2) = 2.0/dt*(q1(0)*q2(3) - q1(1)*q2(2) + q1(2)*q2(1) - q1(3)*q2(0));
+
+			return angular_velocity;
+		}
+
+	private:			
+		// Variables
+		Quaterniond quaternion_old;
+		Quaterniond quaternion_new;
+		double time_old;
+		double time_new;
+		Vector4d q1;
+		Vector4d q2;
 };

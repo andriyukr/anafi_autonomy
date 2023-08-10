@@ -35,6 +35,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	gps_subscriber = this->create_subscription<sensor_msgs::msg::NavSatFix>("drone/gps/location", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::gpsCallback, this, _1));
 	altitude_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/altitude", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::altitudeCallback, this, _1));
 	attitude_subscriber = this->create_subscription<geometry_msgs::msg::QuaternionStamped>("drone/attitude", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::attitudeCallback, this, _1));
+	gimbal_subscriber = this->create_subscription<geometry_msgs::msg::QuaternionStamped>("gimbal/attitude", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::gimbalCallback, this, _1));
 	speed_subscriber = this->create_subscription<geometry_msgs::msg::Vector3Stamped>("drone/speed", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::speedCallback, this, _1));
 	odometry_subscriber = this->create_subscription<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::odometryCallback, this, _1));
 	pose_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("drone/pose", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::poseCallback, this, _1));
@@ -46,8 +47,10 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	camera_publisher = this->create_publisher<anafi_ros_interfaces::msg::CameraCommand>("camera/command", rclcpp::SystemDefaultsQoS());
 	gimbal_publisher = this->create_publisher<anafi_ros_interfaces::msg::GimbalCommand>("gimbal/command", rclcpp::SystemDefaultsQoS());
 	odometry_publisher = this->create_publisher<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS());
-	acceleration_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/linear_acceleration", rclcpp::SystemDefaultsQoS());
-	rate_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/angular_velocity", rclcpp::SystemDefaultsQoS());
+	acceleration_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/linear_acceleration", rclcpp::SensorDataQoS());
+	rate_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/angular_velocity", rclcpp::SensorDataQoS());
+	imu_publisher = this->create_publisher<sensor_msgs::msg::Imu>("drone/imu", rclcpp::SensorDataQoS());
+	camera_imu_publisher = this->create_publisher<sensor_msgs::msg::Imu>("camera/imu", rclcpp::SensorDataQoS());
 	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
 
 	// Services
@@ -569,31 +572,29 @@ void SafeAnafi::gpsCallback(__attribute__((unused)) const sensor_msgs::msg::NavS
 
 void SafeAnafi::altitudeCallback(const std_msgs::msg::Float32& altitude_msg){
 	if(pose_available <= 0 && odometry_available <= 0){
-		time = rclcpp::Time(this->get_clock()->now().seconds(), this->get_clock()->now().nanoseconds());
-		d_t_altitude = (time - time_old_attitude).nanoseconds()/1e9;
+		double time = this->get_clock()->now().nanoseconds()/1e9;
+		d_t_altitude = time - time_old_altitude;
+		time_old_altitude = time;
 
-        position(2) = altitude_msg.data;
+		position(2) = altitude_msg.data;
 
-		time_old_attitude = time;
-
-        altitude_available = 10;
+		altitude_available = 10;
 	}
 }
 
 void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg){
-    if(pose_available <= 0 && odometry_available <= 0){
-        time = rclcpp::Time(quaternion_msg.header.stamp.sec, quaternion_msg.header.stamp.nanosec);
-        double d_t = (time - time_old_attitude).nanoseconds()/1e9;
+	if(pose_available <= 0 && odometry_available <= 0){
+		double time = quaternion_msg.header.stamp.sec + quaternion_msg.header.stamp.nanosec/1e9;
 
-        tf2::Quaternion q(quaternion_msg.quaternion.x, quaternion_msg.quaternion.y, quaternion_msg.quaternion.z, quaternion_msg.quaternion.w);
-        tf2::Matrix3x3 m(q);
-        double roll, pitch;
-        m.getRPY(roll, pitch, yaw);
+		tf2::Quaternion q(quaternion_msg.quaternion.x, quaternion_msg.quaternion.y, quaternion_msg.quaternion.z, quaternion_msg.quaternion.w);
+		tf2::Matrix3x3 m(q);
+		double roll, pitch;
+		m.getRPY(roll, pitch, yaw);
 		yaw = denormalizeAngle(yaw, orientation(2));
 
-        orientation << roll, pitch, yaw;
+		orientation << roll, pitch, yaw;
 		
-		nd_orientation.updateMeasurements(orientation, d_t);
+		nd_orientation.updateMeasurements(orientation, time);
 		rates = nd_orientation.getDerivative();
 
 		geometry_msgs::msg::Vector3Stamped rate_msg;
@@ -603,20 +604,61 @@ void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& qu
 		rate_msg.vector.z = rates(2);
 		rate_publisher->publish(rate_msg);
 
-		time_old_attitude = time;
+		quaternion_drone = Quaterniond(quaternion_msg.quaternion.w, quaternion_msg.quaternion.x, quaternion_msg.quaternion.y, quaternion_msg.quaternion.z);
+		nd_quaternion.updateQuaternion(quaternion_drone, time);
+		Vector3d angular_velocity = nd_quaternion.getAngularVelocity();
 
-        attitude_available = 10;
-    }
+		Vector3d linear_acceleration = nd_velocity.getUnfiltertedDerivative();
+
+		sensor_msgs::msg::Imu imu_msg;
+		imu_msg.header = quaternion_msg.header;
+		imu_msg.orientation = quaternion_msg.quaternion;
+		imu_msg.angular_velocity.x = angular_velocity(0);
+		imu_msg.angular_velocity.y = angular_velocity(1);
+		imu_msg.angular_velocity.z = angular_velocity(2);
+		imu_msg.linear_acceleration.x = linear_acceleration(0);
+		imu_msg.linear_acceleration.y = linear_acceleration(1);
+		imu_msg.linear_acceleration.z = linear_acceleration(2);
+		imu_publisher->publish(imu_msg);
+
+		attitude_available = 10;
+	}
+}
+
+void SafeAnafi::gimbalCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg){
+	double time = quaternion_msg.header.stamp.sec + quaternion_msg.header.stamp.nanosec/1e9;
+
+	quaternion_gimbal = Quaterniond(quaternion_msg.quaternion.w, quaternion_msg.quaternion.x, quaternion_msg.quaternion.y, quaternion_msg.quaternion.z);
+	quaternion_camera = quaternion_gimbal*quaternion_gimbal_camera;
+	nd_quaternion_camera.updateQuaternion(quaternion_camera, time);
+	Vector3d angular_velocity = nd_quaternion_camera.getAngularVelocity();
+
+	Vector3d linear_acceleration = nd_velocity.getUnfiltertedDerivative(); // in drone frame
+	linear_acceleration = quaternion_camera.inverse()*(quaternion_drone*linear_acceleration); // in camera frame
+	
+	sensor_msgs::msg::Imu imu_msg;
+	imu_msg.header.stamp = quaternion_msg.header.stamp;
+	imu_msg.header.frame_id = "/camera";
+	imu_msg.orientation.x = quaternion_camera.x();
+	imu_msg.orientation.y = quaternion_camera.y();
+	imu_msg.orientation.z = quaternion_camera.z();
+	imu_msg.orientation.w = quaternion_camera.w();
+	imu_msg.angular_velocity.x = angular_velocity(0);
+	imu_msg.angular_velocity.y = angular_velocity(1);
+	imu_msg.angular_velocity.z = angular_velocity(2);
+	imu_msg.linear_acceleration.x = linear_acceleration(0);
+	imu_msg.linear_acceleration.y = linear_acceleration(1);
+	imu_msg.linear_acceleration.z = linear_acceleration(2);
+	camera_imu_publisher->publish(imu_msg);
 }
 
 void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg){
     if(odometry_available <= 0){
-        time = rclcpp::Time(speed_msg.header.stamp.sec, speed_msg.header.stamp.nanosec);
-        double d_t = (time - time_old_speed).nanoseconds()/1e9;
+        double time = speed_msg.header.stamp.sec + speed_msg.header.stamp.nanosec/1e9;
 
         velocity << speed_msg.vector.x, speed_msg.vector.y, speed_msg.vector.z;
 
-		nd_velocity.updateMeasurements(velocity, d_t);
+		nd_velocity.updateMeasurements(velocity, time);
 		acceleration = nd_velocity.getDerivative();
 
 		geometry_msgs::msg::Vector3Stamped acceleration_msg;
@@ -626,16 +668,13 @@ void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_ms
 		acceleration_msg.vector.z = acceleration(2);
 		acceleration_publisher->publish(acceleration_msg);
 
-        time_old_speed = time;
-
         velocity_available = 10;
 	}
 }
 
 void SafeAnafi::poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
-	time = rclcpp::Time(pose_msg.header.stamp.sec, pose_msg.header.stamp.nanosec);
-	double d_t = (time - time_old_pose).nanoseconds()/1e9;
-	d_t_altitude = d_t;
+	double time = pose_msg.header.stamp.sec + pose_msg.header.stamp.nanosec/1e9;
+	d_t_altitude = time - time_old_altitude;
 	
 	tf2::Quaternion q(pose_msg.pose.orientation.x, pose_msg.pose.orientation.y, pose_msg.pose.orientation.z, pose_msg.pose.orientation.w);
 	tf2::Matrix3x3 m(q);
@@ -646,10 +685,10 @@ void SafeAnafi::poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	position << pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z;
 	orientation << roll, pitch, yaw;
 		
-	nd_position.updateMeasurements(position, d_t);
+	nd_position.updateMeasurements(position, time);
 	velocity = nd_position.getDerivative();
 	
-	nd_orientation.updateMeasurements(orientation, d_t);
+	nd_orientation.updateMeasurements(orientation, time);
 	rates = nd_orientation.getDerivative();
 
 	nav_msgs::msg::Odometry odometry_msg;
@@ -665,15 +704,14 @@ void SafeAnafi::poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	t.angular.z = rates(2);
 	odometry_publisher->publish(odometry_msg);
 
-	time_old_pose = time;
+	time_old_altitude = time;
 
 	pose_available = 30;
 }
 
 void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
-	time = rclcpp::Time(odometry_msg.header.stamp.sec, odometry_msg.header.stamp.nanosec);
-	double d_t = (time - time_old_odometry).nanoseconds()/1e9;
-	d_t_altitude = d_t;
+	double time = odometry_msg.header.stamp.sec + odometry_msg.header.stamp.nanosec/1e9;
+	d_t_altitude = time - time_old_altitude;
 
 	position << odometry_msg.pose.pose.position.x, odometry_msg.pose.pose.position.y, odometry_msg.pose.pose.position.z;
 
@@ -687,10 +725,10 @@ void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
 
 	velocity << odometry_msg.twist.twist.linear.x, odometry_msg.twist.twist.linear.y, odometry_msg.twist.twist.linear.z;
 
-	nd_velocity.updateMeasurements(velocity, d_t);
+	nd_velocity.updateMeasurements(velocity, time);
 	acceleration = nd_velocity.getDerivative();
 
-	time_old_odometry = time;
+	time_old_altitude = time;
 
 	odometry_available = 40;
 }
@@ -920,8 +958,8 @@ void SafeAnafi::controllers(){
 	mode_move << 	(mode_skycontroller(0) != COMMAND_NONE ? mode_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? mode_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? mode_offboard(0) : ((velocity_available > 0 || odometry_available > 0) ? COMMAND_VELOCITY : COMMAND_ATTITUDE)))),
 				 	(mode_skycontroller(1) != COMMAND_NONE ? mode_skycontroller(1) : (mode_keyboard(1) != COMMAND_NONE ? mode_keyboard(1) : (mode_offboard(1) != COMMAND_NONE ? mode_offboard(1) : COMMAND_VELOCITY))),
 				 	(mode_skycontroller(2) != COMMAND_NONE ? mode_skycontroller(2) : (mode_keyboard(2) != COMMAND_NONE ? mode_keyboard(2) : (mode_offboard(2) != COMMAND_NONE ? mode_offboard(2) : COMMAND_RATE)));
-
-    switch(mode_move(MODE_HORIZONTAL)){ // horizotal
+	
+	switch(mode_move(MODE_HORIZONTAL)){ // horizotal
 	case COMMAND_NONE: // no command
 		rpyg_msg.roll = 0;
 		rpyg_msg.pitch = 0;
@@ -1008,7 +1046,7 @@ void SafeAnafi::controllers(){
 			}
 			if(position(2) >= bounds(2,1) && command_move(2) > 0){
 				command_move(2) = 0;
-				RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *get_clock(), 10000, "The drone is above the maximum altitude (" << bounds(2,0) << "m).");
+				RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *get_clock(), 10000, "The drone is above the maximum altitude (" << bounds(2,1) << "m).");
 			}
 		}
 		rpyg_msg.gaz = command_move(2);

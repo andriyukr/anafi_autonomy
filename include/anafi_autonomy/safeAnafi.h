@@ -17,6 +17,7 @@
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #include <tf2/LinearMath/Quaternion.h>
@@ -43,15 +44,15 @@
 #include <anafi_autonomy/msg/keyboard_drone_command.hpp>
 #include <anafi_autonomy/msg/keyboard_camera_command.hpp>
 
-#define COMMAND_NONE 		0
-#define COMMAND_POSITION 	1
-#define COMMAND_VELOCITY 	2
-#define COMMAND_ATTITUDE 	3
-#define COMMAND_RATE 		4
-#define MODE_HORIZONTAL 	0
-#define MODE_VERTICAL 		1
-#define MODE_HEADING 		2
-#define FILTER_SIZE 		3
+#define COMMAND_NONE 			0
+#define COMMAND_POSITION 		1
+#define COMMAND_VELOCITY 		2
+#define COMMAND_ATTITUDE 		3
+#define COMMAND_RATE 			4
+#define MODE_HORIZONTAL 		0
+#define MODE_VERTICAL 			1
+#define MODE_HEADING 			2
+#define FILTER_SIZE 			3
 #define DERIVATIVE_ACCURACY 	3
 
 #define BOUND3(x, min_x, max_x) (x > max_x ? max_x : (x < min_x ? min_x : x))
@@ -108,7 +109,7 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Subscription<anafi_autonomy::msg::PoseCommand>::SharedPtr reference_pose_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::VelocityCommand>::SharedPtr reference_velocity_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::AttitudeCommand>::SharedPtr reference_attitude_subscriber;
-	    	rclcpp::Subscription<anafi_autonomy::msg::ReferenceCommand>::SharedPtr reference_command_subscriber;
+		rclcpp::Subscription<anafi_autonomy::msg::ReferenceCommand>::SharedPtr reference_command_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::VelocityCommand>::SharedPtr derivative_command_subscriber;
 		rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr reference_gimbal_subscriber;
 		rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr reference_zoom_subscriber;
@@ -116,11 +117,11 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_subscriber;
 		rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr altitude_subscriber;
 		rclcpp::Subscription<geometry_msgs::msg::QuaternionStamped>::SharedPtr attitude_subscriber;
+		rclcpp::Subscription<geometry_msgs::msg::QuaternionStamped>::SharedPtr gimbal_subscriber;
 		rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr speed_subscriber;
 		rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber;
 		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscriber;
 
-		
 		// Publishers
 		rclcpp::Publisher<anafi_ros_interfaces::msg::PilotingCommand>::SharedPtr rpyg_publisher;
 		rclcpp::Publisher<anafi_ros_interfaces::msg::MoveToCommand>::SharedPtr moveto_publisher;
@@ -130,6 +131,8 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher;
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr acceleration_publisher;
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr rate_publisher;
+		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher;
+		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr camera_imu_publisher;
 		rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr desired_velocity_publisher; // FOR DEBUG
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr mode_publisher; // FOR DEBUG
 		
@@ -188,12 +191,12 @@ class SafeAnafi : public rclcpp::Node{
 		bool takingoff_control = false;
 		bool landing_control = false;
 	        
-	        // Feedback
-	        int attitude_available = 0;
-	        int pose_available = 0;
-	       	int odometry_available = 0;
-	       	int altitude_available = 0;
-	       	int velocity_available = 0;
+		// Feedback
+		int attitude_available = 0;
+		int pose_available = 0;
+		int odometry_available = 0;
+		int altitude_available = 0;
+		int velocity_available = 0;
 		
 		// Variables
 		States state = LANDED;
@@ -208,6 +211,10 @@ class SafeAnafi : public rclcpp::Node{
 
 		// Attitude
 		Vector3d orientation = Vector3d::Zero();
+		Quaterniond quaternion_drone = Quaterniond(1, 0, 0, 0);
+		Quaterniond quaternion_gimbal = Quaterniond(1, 0, 0, 0);
+		Quaterniond quaternion_camera = Quaterniond(1, 0, 0, 0);
+		Quaterniond quaternion_gimbal_camera = Quaterniond(0.5, -0.5, 0.5, -0.5);
 		double yaw = 0;
 		double initial_yaw = 0;
 
@@ -267,18 +274,15 @@ class SafeAnafi : public rclcpp::Node{
 		short followme_mode = 0;
 
 		// Time
-		rclcpp::Time time;
-		rclcpp::Time time_old_attitude;
-		rclcpp::Time time_old_altitude;
-		rclcpp::Time time_old_speed;
-		rclcpp::Time time_old_pose;
-		rclcpp::Time time_old_odometry;
+		double time_old_altitude = 0;
 		double d_t_altitude = DBL_MAX;
 		
 		// Numeriacal derivatives
 		NumericalDerivative nd_position = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
 		NumericalDerivative nd_orientation = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
 		NumericalDerivative nd_velocity = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
+		NumericalDerivativeQuaternion nd_quaternion = NumericalDerivativeQuaternion();
+		NumericalDerivativeQuaternion nd_quaternion_camera = NumericalDerivativeQuaternion();
 		
 		// Callbacks
 		void timer_callback();
@@ -299,6 +303,7 @@ class SafeAnafi : public rclcpp::Node{
 		void gpsCallback(const sensor_msgs::msg::NavSatFix& gps_msg);
 		void altitudeCallback(const std_msgs::msg::Float32& altitude_msg);
 		void attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg);
+		void gimbalCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg);
 		void speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg);
 		void poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
 		void odometryCallback(const nav_msgs::msg::Odometry& odometry_msg);
