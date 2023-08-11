@@ -79,12 +79,8 @@ install(TARGETS
 # Install launch files
 install(DIRECTORY
 	launch
-	DESTINATION share/${PROJECT_NAME}/
-)
-
-# Install config files
-install(DIRECTORY
 	config
+	missions
 	DESTINATION share/${PROJECT_NAME}/
 )
 	
