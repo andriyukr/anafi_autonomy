@@ -39,6 +39,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	speed_subscriber = this->create_subscription<geometry_msgs::msg::Vector3Stamped>("drone/speed", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::speedCallback, this, _1));
 	odometry_subscriber = this->create_subscription<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::odometryCallback, this, _1));
 	pose_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("drone/pose", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::poseCallback, this, _1));
+	pose_camera_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("camera/pose", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::cameraPoseCallback, this, _1));
 
 	// Publishers
 	rpyg_publisher = this->create_publisher<anafi_ros_interfaces::msg::PilotingCommand>("drone/command", rclcpp::SystemDefaultsQoS());
@@ -51,6 +52,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	rate_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/angular_velocity", rclcpp::SensorDataQoS());
 	imu_publisher = this->create_publisher<sensor_msgs::msg::Imu>("drone/imu", rclcpp::SensorDataQoS());
 	camera_imu_publisher = this->create_publisher<sensor_msgs::msg::Imu>("camera/imu", rclcpp::SensorDataQoS());
+	position_publisher = this->create_publisher<geometry_msgs::msg::PointStamped>("drone/position/visual", rclcpp::SensorDataQoS());
 	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
 
 	// Services
@@ -571,7 +573,7 @@ void SafeAnafi::gpsCallback(__attribute__((unused)) const sensor_msgs::msg::NavS
 }
 
 void SafeAnafi::altitudeCallback(const std_msgs::msg::Float32& altitude_msg){
-	if(pose_available <= 0 && odometry_available <= 0){
+	if(pose_available <= 0 && odometry_available <= 0 && position_available <= 0){
 		double time = this->get_clock()->now().nanoseconds()/1e9;
 		d_t_altitude = time - time_old_altitude;
 		time_old_altitude = time;
@@ -731,6 +733,28 @@ void SafeAnafi::odometryCallback(const nav_msgs::msg::Odometry& odometry_msg){
 	time_old_altitude = time;
 
 	odometry_available = 40;
+}
+
+void SafeAnafi::cameraPoseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
+	if(pose_available <= 0 && odometry_available <= 0){
+		double time = pose_msg.header.stamp.sec + pose_msg.header.stamp.nanosec/1e9;
+		d_t_position = time - time_old_position;
+		
+		position << pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z; // in camera frame
+		position = quaternion_camera*position; // in world frame
+
+		geometry_msgs::msg::PointStamped position_msg;
+		position_msg.header.stamp = pose_msg.header.stamp;
+		position_msg.header.frame_id = "/world";
+		position_msg.point.x = position(0);
+		position_msg.point.y = position(1);
+		position_msg.point.z = position(2);
+		position_publisher->publish(position_msg);
+
+		time_old_position = time;
+
+		position_available = 10;
+	}
 }
 
 void SafeAnafi::stateMachine(){

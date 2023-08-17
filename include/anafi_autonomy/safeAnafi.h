@@ -11,6 +11,7 @@
 #include <geometry_msgs/msg/quaternion_stamped.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <geometry_msgs/msg/vector3_stamped.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/twist.hpp>
@@ -121,6 +122,7 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr speed_subscriber;
 		rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber;
 		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscriber;
+		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_camera_subscriber;
 
 		// Publishers
 		rclcpp::Publisher<anafi_ros_interfaces::msg::PilotingCommand>::SharedPtr rpyg_publisher;
@@ -133,6 +135,7 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr rate_publisher;
 		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher;
 		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr camera_imu_publisher;
+		rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr position_publisher;
 		rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr desired_velocity_publisher; // FOR DEBUG
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr mode_publisher; // FOR DEBUG
 		
@@ -194,6 +197,7 @@ class SafeAnafi : public rclcpp::Node{
 		// Feedback
 		int attitude_available = 0;
 		int pose_available = 0;
+		int position_available = 0;
 		int odometry_available = 0;
 		int altitude_available = 0;
 		int velocity_available = 0;
@@ -276,6 +280,8 @@ class SafeAnafi : public rclcpp::Node{
 		// Time
 		double time_old_altitude = 0;
 		double d_t_altitude = DBL_MAX;
+		double time_old_position = 0;
+		double d_t_position = DBL_MAX;
 		
 		// Numeriacal derivatives
 		NumericalDerivative nd_position = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
@@ -305,8 +311,9 @@ class SafeAnafi : public rclcpp::Node{
 		void attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg);
 		void gimbalCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg);
 		void speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg);
-		void poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
 		void odometryCallback(const nav_msgs::msg::Odometry& odometry_msg);
+		void poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
+		void cameraPoseCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
 
 		// Functions
 		void stateMachine();
