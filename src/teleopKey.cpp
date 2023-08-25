@@ -46,6 +46,8 @@
 #define KEYCODE_F7  117494069374
 #define KEYCODE_F8  117494069630
 #define KEYCODE_F9  117494132862
+#define KEYCODE_F10 117494133118
+#define KEYCODE_F11 117494133630
 #define KEYCODE_F12 117494133886
 
 #define KEYCODE_ACCENT 96
@@ -166,7 +168,10 @@ class Teleop : public rclcpp::Node{
 			case KEYCODE_F7: // stop mission
 				action.data = 13;
 				break;
-			case KEYCODE_F12: // calibrate magnetometer!
+			case KEYCODE_F9: // initialize VIO
+				action.data = 21;
+				break;
+			case KEYCODE_F11: // calibrate magnetometer!
 				action.data = 111;
 				break;
 
@@ -197,7 +202,7 @@ class Teleop : public rclcpp::Node{
 				break;
 
 			/* gimbal commadns */
-			case KEYCODE_F9: // calibrate gimbal
+			case KEYCODE_F12: // calibrate gimbal
 				camera_msg.action = 111;
 				break;
 			case KEYCODE_5: // reset to (0, 0)

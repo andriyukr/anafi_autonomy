@@ -14,8 +14,8 @@ Trajectory::Trajectory() : Node("trajectory"){
 	RCLCPP_INFO(this->get_logger(), "Trajectory is running...");
 
 	// Publishers
-   command_publisher = this->create_publisher<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS());
-   derivative_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/derivative_command", rclcpp::SystemDefaultsQoS());
+	command_publisher = this->create_publisher<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS());
+	derivative_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/derivative_command", rclcpp::SystemDefaultsQoS());
 
 	// Parameters
 	callback = this->add_on_set_parameters_callback(std::bind(&Trajectory::parameterCallback, this, std::placeholders::_1));

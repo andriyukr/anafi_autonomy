@@ -43,12 +43,26 @@ class NumericalDerivative{
 				finiteDifferenceCoefficients.row(size - 2).tail(size) * measurements / d_times.mean();
 		}
 
+		double getTime(){
+			return time_old;
+		}
+
 		VectorXd getDerivative(){
 			return d_measurements.colwise().mean();
 		}
 
+		VectorXd getSecondDerivative(){
+			cout << "Numerical second derivative is NOT implemented yet!" << endl;
+			return VectorXd::Zero(3);
+		}
+
 		VectorXd getUnfiltertedDerivative(){
 			return (measurements.row(size - 1) - measurements.row(size - 2))/d_times(size - 1);
+		}
+
+		VectorXd getUnfiltertedSecondDerivative(){
+			return ((measurements.row(size - 1) - measurements.row(size - 2))/d_times(size - 1) - 
+				(measurements.row(size - 2) - measurements.row(size - 3))/d_times(size - 2))/d_times(size - 1);
 		}
 
 	private:			
@@ -67,30 +81,30 @@ class NumericalDerivative{
 class NumericalDerivativeQuaternion{
 	public:
 		// Constructor
-		NumericalDerivativeQuaternion(){
-			quaternion_old = Quaterniond(1, 0, 0, 0);
-			quaternion_new = Quaterniond(1, 0, 0, 0);
-			time_old = 0;
-			time_new = DBL_MAX;
-		}
+		NumericalDerivativeQuaternion(){}
 		
 		// Functions
 		void updateQuaternion(Quaterniond q, double t){
+			quaternion_old_old = quaternion_old;
 			quaternion_old = quaternion_new;
 			quaternion_new = q;
 			
+			time_old_old = time_old;
 			time_old = time_new;
 			time_new = t;
 		}
 
-		
+		double getTime(){
+			return time_new;
+		}
+
 		Vector3d getAngularVelocity(){
-			Vector3d angular_velocity;
-
 			double dt = time_new - time_old;
-			q1 << quaternion_old.w(), quaternion_old.x(), quaternion_old.y(), quaternion_old.z();
-			q2 << quaternion_new.w(), quaternion_new.x(), quaternion_new.y(), quaternion_new.z();
 
+			Vector4d q1(quaternion_old.w(), quaternion_old.x(), quaternion_old.y(), quaternion_old.z());
+			Vector4d q2(quaternion_new.w(), quaternion_new.x(), quaternion_new.y(), quaternion_new.z());
+
+			Vector3d angular_velocity;
 			// https://mariogc.com/post/angular-velocity-quaternions/
         	angular_velocity(0) = 2.0/dt*(q1(0)*q2(1) - q1(1)*q2(0) - q1(2)*q2(3) + q1(3)*q2(2));
 			angular_velocity(1) = 2.0/dt*(q1(0)*q2(2) + q1(1)*q2(3) - q1(2)*q2(0) - q1(3)*q2(1));
@@ -99,12 +113,29 @@ class NumericalDerivativeQuaternion{
 			return angular_velocity;
 		}
 
+		Vector3d getAngularAcceleration(){
+			double dt_old = time_old - time_old_old;
+			
+			Vector4d q1(quaternion_old_old.w(), quaternion_old_old.x(), quaternion_old_old.y(), quaternion_old_old.z());
+			Vector4d q2(quaternion_old.w(), quaternion_old.x(), quaternion_old.y(), quaternion_old.z());
+
+			Vector3d angular_velocity_old;
+			// https://mariogc.com/post/angular-velocity-quaternions/
+        	angular_velocity_old(0) = 2.0/dt_old*(q1(0)*q2(1) - q1(1)*q2(0) - q1(2)*q2(3) + q1(3)*q2(2));
+			angular_velocity_old(1) = 2.0/dt_old*(q1(0)*q2(2) + q1(1)*q2(3) - q1(2)*q2(0) - q1(3)*q2(1));
+			angular_velocity_old(2) = 2.0/dt_old*(q1(0)*q2(3) - q1(1)*q2(2) + q1(2)*q2(1) - q1(3)*q2(0));
+
+			Vector3d angular_velocity_new = getAngularVelocity();
+
+			return (angular_velocity_new - angular_velocity_old)/(time_new - time_old);
+		}
+
 	private:			
 		// Variables
-		Quaterniond quaternion_old;
-		Quaterniond quaternion_new;
-		double time_old;
-		double time_new;
-		Vector4d q1;
-		Vector4d q2;
+		Quaterniond quaternion_old_old = Quaterniond(1, 0, 0, 0);
+		Quaterniond quaternion_old = Quaterniond(1, 0, 0, 0);
+		Quaterniond quaternion_new = Quaterniond(1, 0, 0, 0);
+		double time_old_old = 0;
+		double time_old = DBL_MAX/2;
+		double time_new = DBL_MAX;
 };

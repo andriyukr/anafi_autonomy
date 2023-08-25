@@ -91,6 +91,7 @@ enum Actions{
 	MISSION_START = 11,
 	MISSION_PAUSE = 12,
 	MISSION_STOP = 13,
+	INITIALIZE_VIO = 21,
 	REMOTE_CONTROL = 101,
 	OFFBOARD_CONTROL = 102,
 	REBOOT = 110,
@@ -121,7 +122,7 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Subscription<geometry_msgs::msg::QuaternionStamped>::SharedPtr gimbal_subscriber;
 		rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr speed_subscriber;
 		rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber;
-		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscriber;
+		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr mocap_subscriber;
 		rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_camera_subscriber;
 
 		// Publishers
@@ -135,6 +136,7 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr rate_publisher;
 		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher;
 		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr camera_imu_publisher;
+		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr camera_imu_fast_publisher; // FOR ORB_SLAM
 		rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr position_publisher;
 		rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr desired_velocity_publisher; // FOR DEBUG
 		rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr mode_publisher; // FOR DEBUG
@@ -163,9 +165,6 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr calibrate_gimbal_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reboot_client;
 
-		// Messages
-		anafi_ros_interfaces::msg::PilotingCommand rpyg_msg;
-
 		// Requests
 		std::shared_ptr<std_srvs::srv::Trigger_Request_<std::allocator<void>>> trigger_request;
 		std::shared_ptr<std_srvs::srv::SetBool_Request_<std::allocator<void>>> true_request;
@@ -181,11 +180,10 @@ class SafeAnafi : public rclcpp::Node{
 		rclcpp::TimerBase::SharedPtr timer;
 		
 		// Callback
-		OnSetParametersCallbackHandle::SharedPtr callback;
+		OnSetParametersCallbackHandle::SharedPtr parameters_callback;
 
 		// Flags
 		bool armed = false;
-		bool localization = false;
 		bool fixed_frame = false;
 		bool world_frame = false;
 		bool stop_gimbal = false;
@@ -194,49 +192,47 @@ class SafeAnafi : public rclcpp::Node{
 		bool takingoff_control = false;
 		bool landing_control = false;
 	        
-		// Feedback
+		// Tokens
 		int attitude_available = 0;
-		int pose_available = 0;
-		int position_available = 0;
-		int odometry_available = 0;
 		int altitude_available = 0;
-		int velocity_available = 0;
+		int optical_available = 0;
+		int mocap_available = 0;
+		int vision_available = 0;
 		
 		// Variables
 		States state = LANDED;
-		Actions action;
+		Actions action = NONE;
 
 		// Position
-		Vector3d position = Vector3d::Zero();
-		Vector3d position_error = Vector3d::Zero();
+		Vector3d position; // initialised to NaN
+		Vector3d position_mocap; // initialised to NaN
+		Vector3d position_vision; // initialised to NaN
+		Vector3d position_offset = Vector3d::Zero();
 		Vector3d position_error_i = Vector3d::Zero();
-		Vector3d position_error_d = Vector3d::Zero();
 		MatrixXd bounds = MatrixXd::Zero(3, 2);
+		double altitude = NAN;
 
 		// Attitude
-		Vector3d orientation = Vector3d::Zero();
 		Quaterniond quaternion_drone = Quaterniond(1, 0, 0, 0);
 		Quaterniond quaternion_gimbal = Quaterniond(1, 0, 0, 0);
 		Quaterniond quaternion_camera = Quaterniond(1, 0, 0, 0);
-		Quaterniond quaternion_gimbal_camera = Quaterniond(0.5, -0.5, 0.5, -0.5);
+		Quaterniond quaternion_gimbal_camera = Quaterniond(0.5, -0.5, 0.5, -0.5); // calculated in MATLAB
 		double yaw = 0;
-		double initial_yaw = 0;
+		double yaw_old = 0;
+		double yaw_offset = 0;
 
 		// Velocity
-		Vector3d velocity_error = Vector3d::Zero();
+		Vector3d velocity;
+		Vector3d velocity_optical;
+		Vector3d velocity_mocap;
 		Vector3d velocity_error_i = Vector3d::Zero();
-		Vector3d velocity_error_d = Vector3d::Zero();
-		Vector3d velocity = Vector3d::Zero();
-		Vector3d velocity_d = Vector3d::Zero();
-		
-		// Rates
-		Vector3d rates = Vector3d::Zero();
 
 		// Acceleration
-		Vector3d acceleration = Vector3d::Zero();
+		Vector3d acceleration;
+		Vector3d acceleration_optical;
+		Vector3d acceleration_mocap;
 
 		// Commands
-		Vector4d move_command = Vector4d::Zero();
 		Vector4d command_keyboard = Vector4d::Zero();
 		Vector4d command_skycontroller = Vector4d::Zero();
 		Vector4d command_offboard = Vector4d::Zero();
@@ -244,16 +240,12 @@ class SafeAnafi : public rclcpp::Node{
 		Vector4d desired_velocity = Vector4d::Zero();
 		Vector4d desired_attitude = Vector4d::Zero();
 		Vector4d derivative_command = Vector4d::Zero();
-		Vector4d command_move = Vector4d::Zero();
 		Vector3i mode_keyboard = Vector3i::Zero();
 		Vector3i mode_skycontroller = Vector3i::Zero();
 		Vector3i mode_offboard = Vector3i::Zero();
-		Vector3i mode_move = Vector3i::Zero();
-		Vector3d gimbal_command = Vector3d::Zero();
 		Vector3d controller_gimbal_command = Vector3d::Zero();
 		Vector3d keyboard_gimbal_command = Vector3d::Zero();
 		Vector3d offboard_gimbal_command = Vector3d::Zero();
-		double zoom_command = 0;
 		double controller_zoom_command = 0;
 		double keyboard_zoom_command = 0;
 		double offboard_zoom_command = 0;
@@ -268,7 +260,6 @@ class SafeAnafi : public rclcpp::Node{
 		double k_p_yaw = 0;
 
 		// Parameters
-		int controller = 2;
 		double max_tilt;
 		double max_vertical_speed;
 		double max_horizontal_speed;
@@ -278,15 +269,21 @@ class SafeAnafi : public rclcpp::Node{
 		short followme_mode = 0;
 
 		// Time
+		Vector2d dt; 
 		double time_old_altitude = 0;
-		double d_t_altitude = DBL_MAX;
+		double dt_altitude = NAN;
 		double time_old_position = 0;
-		double d_t_position = DBL_MAX;
+		double dt_position = NAN;
+		double time_old_mocap = 0;
+		double dt_mocap = NAN;
+		double time_old_vision = 0;
+		double dt_vision = NAN;
 		
 		// Numeriacal derivatives
 		NumericalDerivative nd_position = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
 		NumericalDerivative nd_orientation = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
 		NumericalDerivative nd_velocity = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
+		NumericalDerivative nd_orientation_mocap = NumericalDerivative(DERIVATIVE_ACCURACY, 3);
 		NumericalDerivativeQuaternion nd_quaternion = NumericalDerivativeQuaternion();
 		NumericalDerivativeQuaternion nd_quaternion_camera = NumericalDerivativeQuaternion();
 		
@@ -311,14 +308,28 @@ class SafeAnafi : public rclcpp::Node{
 		void attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg);
 		void gimbalCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg);
 		void speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg);
-		void odometryCallback(const nav_msgs::msg::Odometry& odometry_msg);
-		void poseCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
+		void mocapCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
 		void cameraPoseCallback(const geometry_msgs::msg::PoseStamped& pose_msg);
-
+		
 		// Functions
 		void stateMachine();
 		void parameter_assign(rcl_interfaces::msg::Parameter &parameter);
 		States resolveState(std::string input);
 		void controllers();
+		void controllerCamera();
 		double denormalizeAngle(double a1, double a2);
+
+		// Stuff for Visual-Odometry (ORB-SLAM)
+		double scale = 1;
+		double time_update = -1.0;
+		double time_camera = 0.0;
+		double time_camera_old = 0.0;
+		Vector3d angular_velocity_camera;
+		Vector3d angular_acceleration_camera;
+		Vector3d linear_acceleration_camera;
+		Vector3d linear_jerk_camera;
+		rclcpp::TimerBase::SharedPtr timer_camera_imu_fast;
+		std::thread thread_initialize_vo;
+		void camera_imu_fast_callback();
+		void initialize_visual_odometry();
 };
