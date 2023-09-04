@@ -23,7 +23,7 @@ fi
 
 number_drones=$1
 
-dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+dir="$(ros2 pkg prefix anafi_ros_nodes)"/shared
 
 for ((i=1; i<=$number_drones; i++))
 do
@@ -37,9 +37,7 @@ done
 
 for ((i=1; i<=$number_drones; i++))
 do
-	ros2 run topic_tools relay /keyboard/action /anafi$i/keyboard/action --ros-args -r __ns:=/anafi$i -r __node:=relay_action &
-	ros2 run topic_tools relay /keyboard/camera_command /anafi$i/keyboard/camera_command --ros-args -r __ns:=/anafi$i -r __node:=relay_camera_command &
-	ros2 run topic_tools relay /keyboard/drone_command /anafi$i/keyboard/drone_command --ros-args -r __ns:=/anafi$i -r __node:=relay_drone_command &
+	ros2 run topic_tools relay /keyboard/command /anafi$i/keyboard/command --ros-args -r __ns:=/anafi$i -r __node:=relay_keyboard_command &
 	ros2 launch anafi_autonomy safe_anafi_launch.py namespace:=anafi$i ip:=192.168.6$i.1 &
 done
 

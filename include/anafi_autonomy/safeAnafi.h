@@ -26,7 +26,6 @@
 #include <tf2/transform_datatypes.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
-#include "anafi_autonomy/numericalDerivative.h"
 #include <anafi_ros_interfaces/msg/piloting_command.hpp>
 #include <anafi_ros_interfaces/msg/move_to_command.hpp>
 #include <anafi_ros_interfaces/msg/move_by_command.hpp>
@@ -42,19 +41,21 @@
 #include <anafi_autonomy/msg/pose_command.hpp>
 #include <anafi_autonomy/msg/velocity_command.hpp>
 #include <anafi_autonomy/msg/attitude_command.hpp>
-#include <anafi_autonomy/msg/keyboard_drone_command.hpp>
-#include <anafi_autonomy/msg/keyboard_camera_command.hpp>
+#include <anafi_autonomy/msg/keyboard_command.hpp>
+#include <anafi_autonomy/numericalDerivative.h>
+
+#define FILTER_SIZE 			3
+#define DERIVATIVE_ACCURACY 	3
 
 #define COMMAND_NONE 			0
 #define COMMAND_POSITION 		1
 #define COMMAND_VELOCITY 		2
 #define COMMAND_ATTITUDE 		3
 #define COMMAND_RATE 			4
+
 #define MODE_HORIZONTAL 		0
 #define MODE_VERTICAL 			1
 #define MODE_HEADING 			2
-#define FILTER_SIZE 			3
-#define DERIVATIVE_ACCURACY 	3
 
 #define BOUND3(x, min_x, max_x) (x > max_x ? max_x : (x < min_x ? min_x : x))
 #define BOUND2(x, min_max) BOUND3(x, -min_max, min_max)
@@ -105,9 +106,8 @@ class SafeAnafi : public rclcpp::Node{
 	private:			
 		// Subsribers	
 		rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr action_subscriber;
-		rclcpp::Subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>::SharedPtr command_skycontroller_subscriber;
-		rclcpp::Subscription<anafi_autonomy::msg::KeyboardDroneCommand>::SharedPtr command_keyboard_subscriber;
-		rclcpp::Subscription<anafi_autonomy::msg::KeyboardCameraCommand>::SharedPtr command_camera_subscriber;
+		rclcpp::Subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>::SharedPtr skycontroller_subscriber;
+		rclcpp::Subscription<anafi_autonomy::msg::KeyboardCommand>::SharedPtr keyboard_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::PoseCommand>::SharedPtr reference_pose_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::VelocityCommand>::SharedPtr reference_velocity_subscriber;
 		rclcpp::Subscription<anafi_autonomy::msg::AttitudeCommand>::SharedPtr reference_attitude_subscriber;
@@ -201,7 +201,8 @@ class SafeAnafi : public rclcpp::Node{
 		
 		// Variables
 		States state = LANDED;
-		Actions action = NONE;
+		Actions action_offboard = NONE;
+		Actions action_keyboard = NONE;
 
 		// Position
 		Vector3d position; // initialised to NaN
@@ -293,8 +294,7 @@ class SafeAnafi : public rclcpp::Node{
 		rcl_interfaces::msg::SetParametersResult parameter_callback(const std::vector<rclcpp::Parameter> &parameters);	
 		void actionCallback(const std_msgs::msg::UInt8& action_msg);
 		void skycontrollerCallback(const anafi_ros_interfaces::msg::SkycontrollerCommand& command_msg);
-		void keyboardCallback(const anafi_autonomy::msg::KeyboardDroneCommand& command_msg);
-		void cameraCallback(const anafi_autonomy::msg::KeyboardCameraCommand& command_msg);
+		void keyboardCallback(const anafi_autonomy::msg::KeyboardCommand& command_msg);
 		void referencePoseCallback(const anafi_autonomy::msg::PoseCommand& command_msg);
 		void referenceVelocityCallback(const anafi_autonomy::msg::VelocityCommand& command_msg);
 		void referenceAttitudeCallback(const anafi_autonomy::msg::AttitudeCommand& command_msg);

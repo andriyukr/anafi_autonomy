@@ -134,6 +134,9 @@ rcl_interfaces::msg::SetParametersResult Trajectory::parameterCallback(const std
 }
 
 void Trajectory::timer_callback(){
+	anafi_autonomy::msg::ReferenceCommand command_msg;
+	anafi_autonomy::msg::VelocityCommand derivative_msg;
+
 	double t = this->get_clock()->now().nanoseconds()/1e9 - initial_t;
 
 	switch(trajectory_type){

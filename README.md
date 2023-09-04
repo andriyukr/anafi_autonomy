@@ -1,5 +1,5 @@
 # ROS2 Package for Parrot Anafi Drones Navigation
-This ROS2 package contains an interface to control drones from the Parrot Anafi family (4K, Thermal, USA, AI, Sphinx).
+This ROS2 package contains an interface to control drones from the Parrot Anafi family (4K, Thermal, USA, Ai, Sphinx).
 
 ## Overview
 
@@ -37,13 +37,22 @@ To build from source, clone the latest version from this repository into your RO
 
 ### Method 1 (without xterm):
 
-To control the drone, in the terminal 1, run:
+To control the drone,
 
-    ros2 launch anafi_autonomy safe_anafi_launch.py
+1. in the terminal 1, run:
 
-and, in terminal 2, run:
+       ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.53.1' model:='ai'
+         
+   where
+   * `ip` has to be
+     * `'192.168.53.1'`, for connection through Skycontroller (recommended),
+     * `'192.168.42.1'`, for direct connection to the drone through WiFi,
+     * `'10.202.0.1'`, for connection to the simulated drone in Sphinx;
+   * `model` can be `'4k'`, `'thermal'`, `'usa'` or `'ai'`, depending on the drone model you are connectiong to.
 
-    ros2 run anafi_autonomy teleop_key --ros-args -r __ns:=/anafi
+1. in terminal 2, run:
+
+       ros2 run anafi_autonomy teleop_key --ros-args -r __ns:=/anafi
     
 The commands can be keyed in terminal 2.
     
@@ -51,7 +60,14 @@ The commands can be keyed in terminal 2.
 
 To control the drone, in the terminal, run:
 
-    ros2 launch anafi_autonomy control_anafi_launch.py
+    ros2 launch anafi_autonomy control_anafi_launch.py ip:='192.168.53.1' model:='ai'
+         
+where
+* `ip` has to be
+  * `'192.168.53.1'`, for connection through Skycontroller (recommended),
+  * `'192.168.42.1'`, for direct connection to the drone through WiFi,
+  * `'10.202.0.1'`, for connection to the simulated drone in Sphinx;
+* `model` can be `'4k'`, `'thermal'`, `'usa'` or `'ai'`, depending on the drone model you are connectiong to.
     
 A new window will pop up where commands can be keyed in.
 

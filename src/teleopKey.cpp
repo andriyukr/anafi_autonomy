@@ -12,9 +12,7 @@
 #include <pthread.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/qos.hpp>
-#include <std_msgs/msg/u_int8.hpp>
-#include <anafi_autonomy/msg/keyboard_drone_command.hpp>
-#include <anafi_autonomy/msg/keyboard_camera_command.hpp>
+#include <anafi_autonomy/msg/keyboard_command.hpp>
 
 #define KEYCODE_a 97
 #define KEYCODE_d 100
@@ -77,7 +75,7 @@ class Teleop : public rclcpp::Node{
 	public:
 		// Constructor
 		Teleop() : Node("keyboard_teleop"){
-			RCLCPP_INFO(this->get_logger(), "Teleop is running...");
+			RCLCPP_INFO(this->get_logger(), "Keyboard is running...");
 			
 			cout <<	"Press: \n"
 				"Insert \t - arm \n"
@@ -96,9 +94,7 @@ class Teleop : public rclcpp::Node{
 				"SPACE \t - halt \n"
 				"r \t - reset pose \n";
 		
-			action_publisher = this->create_publisher<std_msgs::msg::UInt8>("keyboard/action", rclcpp::SystemDefaultsQoS());
-			drone_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardDroneCommand>("keyboard/drone_command", rclcpp::SystemDefaultsQoS());
-			camera_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardCameraCommand>("keyboard/camera_command", rclcpp::SystemDefaultsQoS());
+			command_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardCommand>("keyboard/command", rclcpp::SystemDefaultsQoS());
 						
 			timer = this->create_wall_timer(70ms, std::bind(&Teleop::timer_callback, this));
 		}
@@ -108,155 +104,142 @@ class Teleop : public rclcpp::Node{
 		rclcpp::TimerBase::SharedPtr timer;
 	
 		// Publishers
-		rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr action_publisher;
-		rclcpp::Publisher<anafi_autonomy::msg::KeyboardDroneCommand>::SharedPtr drone_publisher;
-		rclcpp::Publisher<anafi_autonomy::msg::KeyboardCameraCommand>::SharedPtr camera_publisher;
-
-		// Messages
-		std_msgs::msg::UInt8 action;
+		rclcpp::Publisher<anafi_autonomy::msg::KeyboardCommand>::SharedPtr command_publisher;
 
 		// Callback
 		void timer_callback(){
-			anafi_autonomy::msg::KeyboardDroneCommand drone_msg;
-			anafi_autonomy::msg::KeyboardCameraCommand camera_msg;
-			action.data = 0;
+			anafi_autonomy::msg::KeyboardCommand command_msg;
+			command_msg.header.stamp = this->get_clock()->now();
+			command_msg.header.frame_id = "body";
 		
 			if(key != 0)
-				RCLCPP_DEBUG_STREAM(this->get_logger(), "(loop) key = " << key);
+				RCLCPP_DEBUG_STREAM(this->get_logger(), "key = " << key);
 
 			switch(key){
 
 			/* UAV commands */
 			case KEYCODE_Insert: // arm
-				action.data = 1;			   
+				command_msg.drone_action = 1;			   
 				break;
 			case KEYCODE_t: // take-off
-				action.data = 2;
+				command_msg.drone_action = 2;
 				break;
 			case KEYCODE_SPACE: // halt
-				action.data = 3;
+				command_msg.drone_action = 3;
 				break;
 			case KEYCODE_L: // land
 			case KEYCODE_l:
-				action.data = 4;
+				command_msg.drone_action = 4;
 				break;
 			case KEYCODE_Esc: // disarm!
-				action.data = 5;
+				command_msg.drone_action = 5;
 				break;
 			case KEYCODE_R: // reset pose
 			case KEYCODE_r:
-				action.data = 6;
+				command_msg.drone_action = 6;
 				break;
 			case KEYCODE_b: // return-to-home
-				action.data = 7;
+				command_msg.drone_action = 7;
 				break;
 			case KEYCODE_F1: // remote control!
-				action.data = 101;
+				command_msg.drone_action = 101;
 				break;
 			case KEYCODE_F2: // offboard control!
-				action.data = 102;
+				command_msg.drone_action = 102;
 				break;
 			case KEYCODE_F4: // reboot!
-				action.data = 110;
+				command_msg.drone_action = 110;
 				break;
 			case KEYCODE_F5: // start mission
-				action.data = 11;
+				command_msg.drone_action = 11;
 				break;
 			case KEYCODE_F6: // pause mission
-				action.data = 12;
+				command_msg.drone_action = 12;
 				break;
 			case KEYCODE_F7: // stop mission
-				action.data = 13;
+				command_msg.drone_action = 13;
 				break;
 			case KEYCODE_F9: // initialize VIO
-				action.data = 21;
+				command_msg.drone_action = 21;
 				break;
 			case KEYCODE_F11: // calibrate magnetometer!
-				action.data = 111;
+				command_msg.drone_action = 111;
 				break;
 
 			/* UAV movements */
 			case KEYCODE_a:
-				drone_msg.yaw = 100;
+				command_msg.drone_yaw = 1;
 				break;
 			case KEYCODE_d:
-				drone_msg.yaw = -100;
+				command_msg.drone_yaw = -1;
 				break;
 			case KEYCODE_w:
-				drone_msg.z = 100;
+				command_msg.drone_z = 1;
 				break;
 			case KEYCODE_s:
-				drone_msg.z = -100;
+				command_msg.drone_z = -1;
 				break;
 			case KEYCODE_RIGHT: // move right
-				drone_msg.y = -100;
+				command_msg.drone_y = -1;
 				break;
 			case KEYCODE_LEFT: // move left
-				drone_msg.y = 100;
+				command_msg.drone_y = 1;
 				break;
 			case KEYCODE_UP: // move forward
-				drone_msg.x = 100;
+				command_msg.drone_x = 1;
 				break;
 			case KEYCODE_DOWN: // move backward
-				drone_msg.x = -100;
+				command_msg.drone_x = -1;
 				break;
 
 			/* gimbal commadns */
 			case KEYCODE_F12: // calibrate gimbal
-				camera_msg.action = 111;
+				command_msg.camera_action = 111;
 				break;
 			case KEYCODE_5: // reset to (0, 0)
-				camera_msg.action = 11;
+				command_msg.camera_action = 11;
 				break;
 			case KEYCODE_7: // pitch left
-				camera_msg.roll = -100;
+				command_msg.gimbal_roll = -1;
 				break;
 			case KEYCODE_9: // pitch right
-				camera_msg.roll = 100;
+				command_msg.gimbal_roll = 1;
 				break;
 			case KEYCODE_8: // roll up
-				camera_msg.pitch = -100;
+				command_msg.gimbal_pitch = -1;
 				break;
 			case KEYCODE_2: // roll down
-				camera_msg.pitch = 100;
+				command_msg.gimbal_pitch = 1;
 				break;
 			case KEYCODE_4: // yaw left
-				camera_msg.yaw = -100;
+				command_msg.gimbal_yaw = -1;
 				break;
 			case KEYCODE_6: // yaw right
-				camera_msg.yaw = 100;
+				command_msg.gimbal_yaw = 1;
 				break;
 
 			/* camera commands */
 			case KEYCODE_PLUS: // zoom in
-				camera_msg.zoom = 100;
+				command_msg.zoom = 1;
 				break;
 			case KEYCODE_MINUS: // zoom out
-				camera_msg.zoom = -100;
+				command_msg.zoom = -1;
 				break;
 			case KEYCODE_Enter: // take picture
-				camera_msg.action = 1;
+				command_msg.camera_action = 1;
 				break;
 			case KEYCODE_0: // start recording
-				camera_msg.action = 2;
+				command_msg.camera_action = 2;
 				break;
 			case KEYCODE_DOT: // stop recording
-				camera_msg.action = 3;
+				command_msg.camera_action = 3;
 				break;
 			case KEYCODE_SLASH: // download media
-				camera_msg.action = 4;
+				command_msg.camera_action = 4;
 				break;
 			}
 
-			action_publisher->publish(action);
-
-			drone_msg.header.stamp = this->get_clock()->now();
-			drone_msg.header.frame_id = "body";
-			drone_publisher->publish(drone_msg);
-
-			camera_msg.header.stamp = this->get_clock()->now();
-			camera_msg.header.frame_id = "body";
-			camera_publisher->publish(camera_msg);
+			command_publisher->publish(command_msg);
 
 			key = 0;
 		}
@@ -296,7 +279,7 @@ int main(int argc, char** argv){
 	
 	rclcpp::spin(std::make_shared<Teleop>());
 	
-	RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Teleop is stopping...");
+	RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Keyboard is stopping...");
 	tcsetattr(kfd, TCSANOW, &cooked);
 	rclcpp::shutdown();
 	return 0;

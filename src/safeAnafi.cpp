@@ -20,10 +20,9 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	RCLCPP_INFO(this->get_logger(), "SafeAnafi is running...");
 
 	// Subscribers
-	action_subscriber = this->create_subscription<std_msgs::msg::UInt8>("keyboard/action", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::actionCallback, this, _1));
-	command_skycontroller_subscriber = this->create_subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::skycontrollerCallback, this, _1));
-	command_keyboard_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardDroneCommand>("keyboard/drone_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::keyboardCallback, this, _1));
-	command_camera_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardCameraCommand>("keyboard/camera_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::cameraCallback, this, _1));
+	action_subscriber = this->create_subscription<std_msgs::msg::UInt8>("drone/action", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::actionCallback, this, _1));
+	skycontroller_subscriber = this->create_subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::skycontrollerCallback, this, _1));
+	keyboard_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardCommand>("keyboard/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::keyboardCallback, this, _1));
 	reference_pose_subscriber = this->create_subscription<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referencePoseCallback, this, _1));
 	reference_velocity_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/reference_velocity", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceVelocityCallback, this, _1));
 	reference_attitude_subscriber = this->create_subscription<anafi_autonomy::msg::AttitudeCommand>("drone/reference_attitude", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceAttitudeCallback, this, _1));
@@ -51,7 +50,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	rate_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/angular_velocity", rclcpp::SensorDataQoS());
 	imu_publisher = this->create_publisher<sensor_msgs::msg::Imu>("drone/imu", rclcpp::SensorDataQoS());
 	camera_imu_publisher = this->create_publisher<sensor_msgs::msg::Imu>("camera/imu", rclcpp::SensorDataQoS());
-	camera_imu_fast_publisher = this->create_publisher<sensor_msgs::msg::Imu>("camera/imu/fast", rclcpp::SensorDataQoS());  // FOR ORB_SLAM
+	camera_imu_fast_publisher = this->create_publisher<sensor_msgs::msg::Imu>("camera/imu/interpolated", rclcpp::SensorDataQoS());  // FOR ORB_SLAM
 	position_publisher = this->create_publisher<geometry_msgs::msg::PointStamped>("drone/position/vision", rclcpp::SensorDataQoS());
 	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
 
@@ -267,7 +266,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	floating_point_range.to_value = 4000.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("bounds/z/max", 1.0, parameter_descriptor);
+	this->declare_parameter("bounds/z/max", 2.0, parameter_descriptor);
 
 	// Timer
 	timer = this->create_wall_timer(10ms, std::bind(&SafeAnafi::timer_callback, this));
@@ -455,7 +454,7 @@ void SafeAnafi::timer_callback(){
 }
 
 void SafeAnafi::actionCallback(const std_msgs::msg::UInt8& action_msg){
-	action = static_cast<Actions>(action_msg.data);
+	action_offboard = static_cast<Actions>(action_msg.data);
 }
 
 void SafeAnafi::skycontrollerCallback(const anafi_ros_interfaces::msg::SkycontrollerCommand& command_msg){
@@ -463,10 +462,10 @@ void SafeAnafi::skycontrollerCallback(const anafi_ros_interfaces::msg::Skycontro
 	command_skycontroller << max_horizontal_speed/100*command_msg.x, -max_horizontal_speed/100*command_msg.y, max_vertical_speed/100*command_msg.z, -max_yaw_rate/100*command_msg.yaw;
 	mode_skycontroller << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
 	
-	// Move
+	// Gimbal commands
 	controller_gimbal_command << 0, (float)command_msg.camera/100, 0;
 
-	// Change zoom
+	// Zoom command
 	controller_zoom_command = -(float)command_msg.zoom/100;
 
 	// Switch between manual and offboard
@@ -476,17 +475,22 @@ void SafeAnafi::skycontrollerCallback(const anafi_ros_interfaces::msg::Skycontro
 		offboard_client->async_send_request(true_request);
 }
 
-void SafeAnafi::keyboardCallback(const anafi_autonomy::msg::KeyboardDroneCommand& command_msg){
-	command_keyboard << max_horizontal_speed/100*command_msg.x, max_horizontal_speed/100*command_msg.y, max_vertical_speed/100*command_msg.z, max_yaw_rate/100*command_msg.yaw;
-	mode_keyboard << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE),
-			(command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
-}
+void SafeAnafi::keyboardCallback(const anafi_autonomy::msg::KeyboardCommand& command_msg){
+	// Drone actions
+	action_keyboard = static_cast<Actions>(command_msg.drone_action);
+	
+	// Drone commands
+	command_keyboard << max_horizontal_speed*command_msg.drone_x, max_horizontal_speed*command_msg.drone_y, max_vertical_speed*command_msg.drone_z, max_yaw_rate*command_msg.drone_yaw;
+	mode_keyboard << ((command_msg.drone_x != 0 || command_msg.drone_y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.drone_z != 0 ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.drone_yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
 
-void SafeAnafi::cameraCallback(const anafi_autonomy::msg::KeyboardCameraCommand& command_msg){
-	keyboard_gimbal_command << command_msg.roll/100, command_msg.pitch/100, command_msg.yaw/100;
-	keyboard_zoom_command = command_msg.zoom/100;
+	// Gimbal commands
+	keyboard_gimbal_command << command_msg.gimbal_roll, command_msg.gimbal_pitch, command_msg.gimbal_yaw;
+	
+	// Zoom command
+	keyboard_zoom_command = command_msg.zoom;
 
-	switch(command_msg.action){
+	// Camera actions
+	switch(command_msg.camera_action){
 	case 1:
 		take_photo_client->async_send_request(photo_request);
 		break;
@@ -738,8 +742,9 @@ void SafeAnafi::cameraPoseCallback(const geometry_msgs::msg::PoseStamped& pose_m
 	dt_vision = time - time_old_vision;
 		
 	position_vision << pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z; // in camera frame
-	position_vision = quaternion_camera*position_vision; // in world frame
 	position_vision *= scale;
+	if(pose_msg.header.frame_id == "orb_slam")
+		position_vision = quaternion_gimbal_camera*position_vision; // in world frame
 
 	geometry_msgs::msg::PointStamped position_msg;
 	position_msg.header.stamp = pose_msg.header.stamp;
@@ -779,6 +784,10 @@ void SafeAnafi::initialize_visual_odometry(){
 }
 
 void SafeAnafi::stateMachine(){
+	Actions action =(action_keyboard != NONE ? action_keyboard : action_offboard);
+	action_keyboard = NONE;
+	action_offboard = NONE;
+
 	switch(action){ // State-indipendent actions
 	case DISARM: // emergency
 		emergency_client->async_send_request(trigger_request);
@@ -830,7 +839,7 @@ void SafeAnafi::stateMachine(){
 			if(armed)
 				takeoff_client->async_send_request(trigger_request);
 			else
-				RCLCPP_WARN(this->get_logger(), "Arm the drone with 'Insert' before taking-off.");
+				RCLCPP_WARN(this->get_logger(), "Arm the drone before taking-off.");
 			break;
 		case MISSION_START:
 			if(mission_type == 0){ // flight plan
@@ -842,7 +851,7 @@ void SafeAnafi::stateMachine(){
 					flightplan_start_client->async_send_request(flightplan_request);
 				}
 				else
-					RCLCPP_WARN(this->get_logger(), "Arm the drone with 'Insert' before starting the mission.");
+					RCLCPP_WARN(this->get_logger(), "Arm the drone before starting the mission.");
 			}
 			else
 				RCLCPP_WARN(this->get_logger(), "The drone has to be in the air.");
@@ -984,8 +993,6 @@ void SafeAnafi::stateMachine(){
 			break;
 		}
 	}
-	
-	action = NONE;
 }
 
 States SafeAnafi::resolveState(std::string input){

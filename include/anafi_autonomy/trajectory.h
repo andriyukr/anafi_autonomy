@@ -26,7 +26,7 @@ class Trajectory : public rclcpp::Node{
 		// Constructor
 		Trajectory();
 		
-	private:		
+	private:
 		// Timer
 		rclcpp::TimerBase::SharedPtr timer;
 		
@@ -49,13 +49,9 @@ class Trajectory : public rclcpp::Node{
 		std::string file_waypoints = "";
 		MatrixXd waypoints;
 		Vector4d w1;
-    	Vector4d w2;
+		Vector4d w2;
 		int waypoint = 0;
-		
-		// Messages
-		anafi_autonomy::msg::ReferenceCommand command_msg;
-		anafi_autonomy::msg::VelocityCommand derivative_msg;
-		
+
 		// Callback
 		void timer_callback();
 		rcl_interfaces::msg::SetParametersResult parameterCallback(const std::vector<rclcpp::Parameter> &parameters);

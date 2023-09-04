@@ -1,6 +1,6 @@
 # Usage: 
-# 	- connection through Skycontroiller [recommended]:
-# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.53.1'
+# 	- connection through Skycontroller [recommended]:
+# 		ros2 launch anafi_autonomy safe_anafi_launch.py
 #	- direct connection to Anafi:
 # 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.42.1' model:='ai'
 #	- connection to the simulated drone in Sphinx:
@@ -66,7 +66,7 @@ def generate_launch_description():
 			{'bounds/y/min': -1.0}, 
 			{'bounds/y/max': 1.0},
 			{'bounds/z/min': 0.0}, 
-			{'bounds/z/max': 1.0} 
+			{'bounds/z/max': 2.0} 
 		]
 	)
 	

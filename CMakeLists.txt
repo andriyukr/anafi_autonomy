@@ -26,8 +26,7 @@ set(msg_files
 	"msg/PoseCommand.msg"
 	"msg/VelocityCommand.msg"
 	"msg/AttitudeCommand.msg"
-	"msg/KeyboardDroneCommand.msg"
-	"msg/KeyboardCameraCommand.msg"
+	"msg/KeyboardCommand.msg"
 	"msg/Position.msg"
 )
 
@@ -70,10 +69,19 @@ ament_target_dependencies(trajectory
 	rclcpp)
 target_link_libraries(trajectory "${cpp_typesupport_target}")
 
+add_executable(example src/example.cpp)
+ament_target_dependencies(example 
+	rclcpp 
+	std_msgs
+	geometry_msgs
+	sensor_msgs)
+target_link_libraries(example "${cpp_typesupport_target}")
+
 install(TARGETS
 	safe_anafi
 	teleop_key
 	trajectory
+	example
 	DESTINATION lib/${PROJECT_NAME})
 	
 # Install launch files
