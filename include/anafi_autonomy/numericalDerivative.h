@@ -52,7 +52,6 @@ class NumericalDerivative{
 		}
 
 		VectorXd getSecondDerivative(){
-			cout << "Numerical second derivative is NOT implemented yet!" << endl;
 			return VectorXd::Zero(3);
 		}
 

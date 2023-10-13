@@ -23,7 +23,7 @@ fi
 
 number_drones=$1
 
-dir="$(ros2 pkg prefix anafi_ros_nodes)"/shared
+dir="$(ros2 pkg prefix anafi_ros_nodes)"/share/anafi_ros_nodes
 
 for ((i=1; i<=$number_drones; i++))
 do

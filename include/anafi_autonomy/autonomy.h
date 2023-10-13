@@ -37,12 +37,14 @@
 #include <anafi_ros_interfaces/srv/photo.hpp>
 #include <anafi_ros_interfaces/srv/recording.hpp>
 
+#include <anafi_autonomy/controller.h>
+#include <anafi_autonomy/numericalDerivative.h>
+
 #include <anafi_autonomy/msg/reference_command.hpp>
 #include <anafi_autonomy/msg/pose_command.hpp>
 #include <anafi_autonomy/msg/velocity_command.hpp>
 #include <anafi_autonomy/msg/attitude_command.hpp>
 #include <anafi_autonomy/msg/keyboard_command.hpp>
-#include <anafi_autonomy/numericalDerivative.h>
 
 #define FILTER_SIZE 			3
 #define DERIVATIVE_ACCURACY 	3
@@ -99,9 +101,9 @@ enum Actions{
 	CALIBRATE = 111
 };
 
-class SafeAnafi : public rclcpp::Node{
+class Autonomy : public rclcpp::Node{
 	public:
-		SafeAnafi();
+		Autonomy();
 
 	private:			
 		// Subsribers	
@@ -193,8 +195,8 @@ class SafeAnafi : public rclcpp::Node{
 		bool landing_control = false;
 	        
 		// Tokens
-		int attitude_available = 0;
-		int altitude_available = 0;
+		int magnetometer_available = 0;
+		int barometer_available = 0;
 		int optical_available = 0;
 		int mocap_available = 0;
 		int vision_available = 0;
@@ -209,7 +211,6 @@ class SafeAnafi : public rclcpp::Node{
 		Vector3d position_mocap; // initialised to NaN
 		Vector3d position_vision; // initialised to NaN
 		Vector3d position_offset = Vector3d::Zero();
-		Vector3d position_error_i = Vector3d::Zero();
 		MatrixXd bounds = MatrixXd::Zero(3, 2);
 		double altitude = NAN;
 
@@ -220,6 +221,9 @@ class SafeAnafi : public rclcpp::Node{
 		Quaterniond quaternion_gimbal_camera = Quaterniond(0.5, -0.5, 0.5, -0.5); // calculated in MATLAB
 		double yaw = 0;
 		double yaw_old = 0;
+		double yaw_magnetometer = 0;
+		double yaw_mocap = 0;
+		double yaw_vision = 0;
 		double yaw_offset = 0;
 
 		// Velocity
@@ -252,13 +256,16 @@ class SafeAnafi : public rclcpp::Node{
 		double offboard_zoom_command = 0;
 
 		// Gains
-		double k_p_position = 0;
-		double k_i_position = 0;
-		double k_d_position = 0;
-		double max_i_position = 0;
-		double k_p_velocity = 0;
-		double k_d_velocity = 0;
-		double k_p_yaw = 0;
+		double k_position_p = 0;
+		double k_position_i = 0;
+		double k_position_d = 0;
+		double max_position_i = 0;
+		double k_velocity_p = 0;
+		double k_velocity_d = 0;
+		double k_yaw_p = 0;
+
+		// Error
+		Vector3d position_error_i = Vector3d::Zero();
 
 		// Parameters
 		double max_tilt;
@@ -318,6 +325,18 @@ class SafeAnafi : public rclcpp::Node{
 		void controllers();
 		void controllerCamera();
 		double denormalizeAngle(double a1, double a2);
+		Vector2d rotateVector(Vector2d v, double a);
+
+		// Controller
+		std::shared_ptr<Controller> controller;
+		std::thread thread_controller;
+		void spin_controller(){
+			auto options = rclcpp::NodeOptions().use_global_arguments(true);
+			controller = std::make_shared<Controller>(options);
+			rclcpp::spin(controller);
+			RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Controller is stopping...");
+			rclcpp::shutdown();
+		}
 
 		// Stuff for Visual-Odometry (ORB-SLAM)
 		double scale = 1;

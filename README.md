@@ -41,7 +41,7 @@ To control the drone,
 
 1. in the terminal 1, run:
 
-       ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.53.1' model:='ai'
+       ros2 launch anafi_autonomy anafi_autonomy_launch.py ip:='192.168.53.1' model:='ai'
          
    where
    * `ip` has to be
@@ -52,7 +52,7 @@ To control the drone,
 
 1. in terminal 2, run:
 
-       ros2 run anafi_autonomy teleop_key --ros-args -r __ns:=/anafi
+       ros2 run anafi_autonomy keyboard --ros-args -r __ns:=/anafi
     
 The commands can be keyed in terminal 2.
     

@@ -1,4 +1,4 @@
-/** *************************** safeAnafi.cpp ***************************
+/** *************************** autonomy.cpp ***************************
  *
  * This node collects all the messages:
  *	  - Feedback from the UAV: state estimates for odometry
@@ -13,31 +13,35 @@
  *
  * *********************************************************************/
 
-#include "anafi_autonomy/safeAnafi.h"
+#include "anafi_autonomy/autonomy.h"
 
 // Constructor
-SafeAnafi::SafeAnafi() : Node("safe_anafi"){
-	RCLCPP_INFO(this->get_logger(), "SafeAnafi is running...");
+Autonomy::Autonomy() : Node("autonomy"){
+	RCLCPP_INFO(this->get_logger(), "Autonomy is running...");
+
+	// Create controller node
+	//thread_controller = std::thread(&Autonomy::spin_controller, this);
+	//thread_controller.detach();
 
 	// Subscribers
-	action_subscriber = this->create_subscription<std_msgs::msg::UInt8>("drone/action", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::actionCallback, this, _1));
-	skycontroller_subscriber = this->create_subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::skycontrollerCallback, this, _1));
-	keyboard_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardCommand>("keyboard/command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::keyboardCallback, this, _1));
-	reference_pose_subscriber = this->create_subscription<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referencePoseCallback, this, _1));
-	reference_velocity_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/reference_velocity", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceVelocityCallback, this, _1));
-	reference_attitude_subscriber = this->create_subscription<anafi_autonomy::msg::AttitudeCommand>("drone/reference_attitude", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceAttitudeCallback, this, _1));
-	reference_command_subscriber = this->create_subscription<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceCommandCallback, this, _1));
-	derivative_command_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/derivative_command", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::derivativeCommandCallback, this, _1));
-	reference_gimbal_subscriber = this->create_subscription<geometry_msgs::msg::Vector3>("drone/reference_gimbal", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceGimbalCallback, this, _1));
-	reference_zoom_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/reference_zoom", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::referenceZoomCallback, this, _1));
-	state_subscriber = this->create_subscription<std_msgs::msg::String>("drone/state", rclcpp::SystemDefaultsQoS(), std::bind(&SafeAnafi::stateCallback, this, _1));
-	gps_subscriber = this->create_subscription<sensor_msgs::msg::NavSatFix>("drone/gps/location", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::gpsCallback, this, _1));
-	altitude_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/altitude", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::altitudeCallback, this, _1));
-	attitude_subscriber = this->create_subscription<geometry_msgs::msg::QuaternionStamped>("drone/attitude", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::attitudeCallback, this, _1));
-	gimbal_subscriber = this->create_subscription<geometry_msgs::msg::QuaternionStamped>("gimbal/attitude", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::gimbalCallback, this, _1));
-	speed_subscriber = this->create_subscription<geometry_msgs::msg::Vector3Stamped>("drone/speed", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::speedCallback, this, _1));
-	mocap_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("drone/pose", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::mocapCallback, this, _1));
-	pose_camera_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("camera/pose", rclcpp::SensorDataQoS(), std::bind(&SafeAnafi::cameraPoseCallback, this, _1));
+	action_subscriber = this->create_subscription<std_msgs::msg::UInt8>("drone/action", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::actionCallback, this, _1));
+	skycontroller_subscriber = this->create_subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::skycontrollerCallback, this, _1));
+	keyboard_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardCommand>("keyboard/command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::keyboardCallback, this, _1));
+	reference_pose_subscriber = this->create_subscription<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referencePoseCallback, this, _1));
+	reference_velocity_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/reference_velocity", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceVelocityCallback, this, _1));
+	reference_attitude_subscriber = this->create_subscription<anafi_autonomy::msg::AttitudeCommand>("drone/reference_attitude", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceAttitudeCallback, this, _1));
+	reference_command_subscriber = this->create_subscription<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceCommandCallback, this, _1));
+	derivative_command_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/derivative_command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::derivativeCommandCallback, this, _1));
+	reference_gimbal_subscriber = this->create_subscription<geometry_msgs::msg::Vector3>("drone/reference_gimbal", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceGimbalCallback, this, _1));
+	reference_zoom_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/reference_zoom", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceZoomCallback, this, _1));
+	state_subscriber = this->create_subscription<std_msgs::msg::String>("drone/state", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::stateCallback, this, _1));
+	gps_subscriber = this->create_subscription<sensor_msgs::msg::NavSatFix>("drone/gps/location", rclcpp::SensorDataQoS(), std::bind(&Autonomy::gpsCallback, this, _1));
+	altitude_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/altitude", rclcpp::SensorDataQoS(), std::bind(&Autonomy::altitudeCallback, this, _1));
+	attitude_subscriber = this->create_subscription<geometry_msgs::msg::QuaternionStamped>("drone/attitude", rclcpp::SensorDataQoS(), std::bind(&Autonomy::attitudeCallback, this, _1));
+	gimbal_subscriber = this->create_subscription<geometry_msgs::msg::QuaternionStamped>("gimbal/attitude", rclcpp::SensorDataQoS(), std::bind(&Autonomy::gimbalCallback, this, _1));
+	speed_subscriber = this->create_subscription<geometry_msgs::msg::Vector3Stamped>("drone/speed", rclcpp::SensorDataQoS(), std::bind(&Autonomy::speedCallback, this, _1));
+	mocap_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("drone/pose", rclcpp::SensorDataQoS(), std::bind(&Autonomy::mocapCallback, this, _1));
+	pose_camera_subscriber = this->create_subscription<geometry_msgs::msg::PoseStamped>("camera/pose", rclcpp::SensorDataQoS(), std::bind(&Autonomy::cameraPoseCallback, this, _1));
 
 	// Publishers
 	rpyg_publisher = this->create_publisher<anafi_ros_interfaces::msg::PilotingCommand>("drone/command", rclcpp::SystemDefaultsQoS());
@@ -88,7 +92,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	true_request->data = true;
 
 	// Parameters
-	parameters_callback = this->add_on_set_parameters_callback(std::bind(&SafeAnafi::parameter_callback, this, std::placeholders::_1));
+	parameters_callback = this->add_on_set_parameters_callback(std::bind(&Autonomy::parameter_callback, this, std::placeholders::_1));
 
 	rcl_interfaces::msg::ParameterDescriptor parameter_descriptor;
 	rcl_interfaces::msg::IntegerRange integer_range;
@@ -115,7 +119,7 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	this->declare_parameter("fixed_frame", false, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
-	parameter_descriptor.description = "Yaw in world frame";
+	parameter_descriptor.description = "Yaw aligned with North";
 	this->declare_parameter("world_frame", false, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
@@ -210,47 +214,42 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Min x bound";
-	parameter_descriptor.read_only = true;
 	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
 	floating_point_range.from_value = -4000.0;
 	floating_point_range.to_value = 4000.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("bounds/x/min", -1.0, parameter_descriptor);
+	this->declare_parameter("bounds/x/min", -10.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Max x bound";
-	parameter_descriptor.read_only = true;
 	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
 	floating_point_range.from_value = -4000.0;
 	floating_point_range.to_value = 4000.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("bounds/x/max", 1.0, parameter_descriptor);
+	this->declare_parameter("bounds/x/max", 10.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Min y bound";
-	parameter_descriptor.read_only = true;
 	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
 	floating_point_range.from_value = -4000.0;
 	floating_point_range.to_value = 4000.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("bounds/y/min", -1.0, parameter_descriptor);
+	this->declare_parameter("bounds/y/min", -10.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Max y bound";
-	parameter_descriptor.read_only = true;
 	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
 	floating_point_range.from_value = -4000.0;
 	floating_point_range.to_value = 4000.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("bounds/y/max", 1.0, parameter_descriptor);
+	this->declare_parameter("bounds/y/max", 10.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Min z bound";
-	parameter_descriptor.read_only = true;
 	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
 	floating_point_range.from_value = 0.0;
 	floating_point_range.to_value = 4000.0;
@@ -260,7 +259,6 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Max z bound";
-	parameter_descriptor.read_only = true;
 	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
 	floating_point_range.from_value = 0.0;
 	floating_point_range.to_value = 4000.0;
@@ -269,15 +267,15 @@ SafeAnafi::SafeAnafi() : Node("safe_anafi"){
 	this->declare_parameter("bounds/z/max", 2.0, parameter_descriptor);
 
 	// Timer
-	timer = this->create_wall_timer(10ms, std::bind(&SafeAnafi::timer_callback, this));
-	timer_camera_imu_fast = this->create_wall_timer(10ms, std::bind(&SafeAnafi::camera_imu_fast_callback, this));  // FOR ORB_SLAM
+	timer = this->create_wall_timer(10ms, std::bind(&Autonomy::timer_callback, this));
+	timer_camera_imu_fast = this->create_wall_timer(100ms, std::bind(&Autonomy::camera_imu_fast_callback, this));  // FOR ORB_SLAM
 
 	// Parameters client
 	auto parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(this, "anafi");
-	param_events_subscriber = parameters_client->on_parameter_event(std::bind(&SafeAnafi::parameter_events_callback, this, std::placeholders::_1));
+	param_events_subscriber = parameters_client->on_parameter_event(std::bind(&Autonomy::parameter_events_callback, this, std::placeholders::_1));
 }
 
-rcl_interfaces::msg::SetParametersResult SafeAnafi::parameter_callback(const std::vector<rclcpp::Parameter> &parameters){
+rcl_interfaces::msg::SetParametersResult Autonomy::parameter_callback(const std::vector<rclcpp::Parameter> &parameters){
 	auto result = rcl_interfaces::msg::SetParametersResult();
 	result.successful = true;
 
@@ -328,38 +326,38 @@ rcl_interfaces::msg::SetParametersResult SafeAnafi::parameter_callback(const std
 			return result;
 		}
 		if(parameter.get_name() == "gains/position/p"){
-			k_p_position = parameter.as_double();
-			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_p_position' set to %.1f", k_p_position);
+			k_position_p = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_position_p' set to %.1f", k_position_p);
 			return result;
 		}
 		if(parameter.get_name() == "gains/position/i"){
-			k_i_position = parameter.as_double();
-			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_i_position' set to %.1f", k_i_position);
+			k_position_i = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_position_i' set to %.1f", k_position_i);
 			return result;
 		}
 		if(parameter.get_name() == "gains/position/d"){
-			k_d_position = parameter.as_double();
-			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_d_position' set to %.1f", k_d_position);
+			k_position_d = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_position_d' set to %.1f", k_position_d);
 			return result;
 		}
 		if(parameter.get_name() == "gains/position/max_i"){
-			max_i_position = parameter.as_double();
-			RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_i_position' set to %.1f", max_i_position);
+			max_position_i = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_position_i' set to %.1f", max_position_i);
 			return result;
 		}
 		if(parameter.get_name() == "gains/velocity/p"){
-			k_p_velocity = parameter.as_double();
-			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_p_velocity' set to %.1f", k_p_velocity);
+			k_velocity_p = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_velocity_p' set to %.1f", k_velocity_p);
 			return result;
 		}
 		if(parameter.get_name() == "gains/velocity/d"){
-			k_d_velocity = parameter.as_double();
-			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_d_velocity' set to %.1f", k_d_velocity);
+			k_velocity_d = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_velocity_d' set to %.1f", k_velocity_d);
 			return result;
 		}
 		if(parameter.get_name() == "gains/yaw/p"){
-			k_p_yaw = parameter.as_double();
-			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_p_yaw' set to %.1f", k_p_yaw);
+			k_yaw_p = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_yaw_p' set to %.1f", k_yaw_p);
 			return result;
 		}
 		if(parameter.get_name() == "bounds/x/min"){
@@ -398,14 +396,14 @@ rcl_interfaces::msg::SetParametersResult SafeAnafi::parameter_callback(const std
 	return result;
 }
 
-void SafeAnafi::parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event){
+void Autonomy::parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event){
 	for(rcl_interfaces::msg::Parameter & changed_parameter : event->changed_parameters)
 		parameter_assign(changed_parameter);
 	for(rcl_interfaces::msg::Parameter & new_parameter : event->new_parameters)
 		parameter_assign(new_parameter);
 }
 
-void SafeAnafi::parameter_assign(rcl_interfaces::msg::Parameter & parameter){
+void Autonomy::parameter_assign(rcl_interfaces::msg::Parameter & parameter){
 	if(parameter.name == "drone/max_vertical_speed"){
 		max_vertical_speed = parameter.value.double_value;
 		RCLCPP_DEBUG(this->get_logger(), "Parameter 'drone/max_vertical_speed' set to %.1f", max_vertical_speed);
@@ -424,11 +422,11 @@ void SafeAnafi::parameter_assign(rcl_interfaces::msg::Parameter & parameter){
 	}
 }
 
-void SafeAnafi::timer_callback(){
+void Autonomy::timer_callback(){
 	// Select position sourse
 	position << 	(mocap_available > 0 ? position_mocap(0) : (vision_available > 0 ? position_vision(0) : NAN)), // priority: mocap > vision
 					(mocap_available > 0 ? position_mocap(1) : (vision_available > 0 ? position_vision(1) : NAN)), // priority: mocap > vision
-					(mocap_available > 0 ? position_mocap(2) : (altitude_available > 0 ? altitude : NAN)); // priority: mocap > barometer
+					(mocap_available > 0 ? position_mocap(2) : (barometer_available > 0 ? altitude : NAN)); // priority: mocap > barometer
 	// Select velocity sourse
 	velocity << 	(mocap_available > 0 ? velocity_mocap(0) : (optical_available > 0 ? velocity_optical(0) : NAN)), // priority: mocap > optical flow
 					(mocap_available > 0 ? velocity_mocap(1) : (optical_available > 0 ? velocity_optical(1) : NAN)), // priority: mocap > optical flow
@@ -437,27 +435,31 @@ void SafeAnafi::timer_callback(){
 	acceleration << (mocap_available > 0 ? acceleration_mocap(0) : (optical_available > 0 ? acceleration_optical(0) : NAN)), // priority: mocap > optical flow
 					(mocap_available > 0 ? acceleration_mocap(1) : (optical_available > 0 ? acceleration_optical(1) : NAN)), // priority: mocap > optical flow
 					(mocap_available > 0 ? acceleration_mocap(2) : (optical_available > 0 ? acceleration_optical(2) : NAN)); // priority: mocap > barometer
+	// Select yaw sourse
+	yaw_old = yaw;
+	yaw = (mocap_available > 0 ? yaw_mocap : (magnetometer_available > 0 ? yaw_magnetometer : (vision_available > 0 ? yaw_vision : NAN))); // priority: mocap > magnetometer > vision
+	yaw = denormalizeAngle(yaw, yaw_old);
 	// Select time difference sourse
 	dt << 	(mocap_available > 0 ? dt_mocap : (vision_available > 0 ? dt_vision : NAN)), // priority: mocap > vision
-			(mocap_available > 0 ? dt_mocap : (altitude_available > 0 ? dt_altitude : NAN)); // priority: mocap > onboard
+			(mocap_available > 0 ? dt_mocap : (barometer_available > 0 ? dt_altitude : NAN)); // priority: mocap > onboard
 
 	stateMachine();
 
 	// Consume tokens
-	mocap_available    = mocap_available > 0    ? mocap_available - 1    : 0;
-	vision_available   = vision_available > 0   ? vision_available - 1   : 0;
-	altitude_available = altitude_available > 0 ? altitude_available - 1 : 0;
-	optical_available  = optical_available > 0  ? optical_available - 1  : 0;
-	attitude_available = attitude_available > 0 ? attitude_available - 1 : 0;
+	mocap_available    		= mocap_available > 0    ? mocap_available - 1    : 0;
+	vision_available   		= vision_available > 0   ? vision_available - 1   : 0;
+	barometer_available 	= barometer_available > 0 ? barometer_available - 1 : 0;
+	optical_available  		= optical_available > 0  ? optical_available - 1  : 0;
+	magnetometer_available 	= magnetometer_available > 0 ? magnetometer_available - 1 : 0;
 
 	controllerCamera();
 }
 
-void SafeAnafi::actionCallback(const std_msgs::msg::UInt8& action_msg){
+void Autonomy::actionCallback(const std_msgs::msg::UInt8& action_msg){
 	action_offboard = static_cast<Actions>(action_msg.data);
 }
 
-void SafeAnafi::skycontrollerCallback(const anafi_ros_interfaces::msg::SkycontrollerCommand& command_msg){
+void Autonomy::skycontrollerCallback(const anafi_ros_interfaces::msg::SkycontrollerCommand& command_msg){
 	// Drone commands
 	command_skycontroller << max_horizontal_speed/100*command_msg.x, -max_horizontal_speed/100*command_msg.y, max_vertical_speed/100*command_msg.z, -max_yaw_rate/100*command_msg.yaw;
 	mode_skycontroller << ((command_msg.x != 0 || command_msg.y != 0) ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.z != 0 ? COMMAND_VELOCITY : COMMAND_NONE), (command_msg.yaw != 0 ? COMMAND_RATE : COMMAND_NONE);
@@ -475,7 +477,7 @@ void SafeAnafi::skycontrollerCallback(const anafi_ros_interfaces::msg::Skycontro
 		offboard_client->async_send_request(true_request);
 }
 
-void SafeAnafi::keyboardCallback(const anafi_autonomy::msg::KeyboardCommand& command_msg){
+void Autonomy::keyboardCallback(const anafi_autonomy::msg::KeyboardCommand& command_msg){
 	// Drone actions
 	action_keyboard = static_cast<Actions>(command_msg.drone_action);
 	
@@ -513,23 +515,23 @@ void SafeAnafi::keyboardCallback(const anafi_autonomy::msg::KeyboardCommand& com
 	}
 }
 
-void SafeAnafi::referencePoseCallback(const anafi_autonomy::msg::PoseCommand& command_msg){
+void Autonomy::referencePoseCallback(const anafi_autonomy::msg::PoseCommand& command_msg){
 	command_offboard << command_msg.x, command_msg.y, command_msg.z, command_msg.yaw*M_PI/180;
 	mode_offboard << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ATTITUDE;
 	derivative_command << 0, 0, 0, 0;
 }
 
-void SafeAnafi::referenceVelocityCallback(const anafi_autonomy::msg::VelocityCommand& command_msg){
+void Autonomy::referenceVelocityCallback(const anafi_autonomy::msg::VelocityCommand& command_msg){
 	command_offboard << command_msg.vx, command_msg.vy, command_msg.vz, command_msg.yaw_rate;
 	mode_offboard << COMMAND_VELOCITY, COMMAND_VELOCITY, COMMAND_RATE;
 }
 
-void SafeAnafi::referenceAttitudeCallback(const anafi_autonomy::msg::AttitudeCommand& command_msg){
+void Autonomy::referenceAttitudeCallback(const anafi_autonomy::msg::AttitudeCommand& command_msg){
 	command_offboard << command_msg.roll*M_PI/180, command_msg.pitch*M_PI/180, command_msg.trottle, command_msg.yaw*M_PI/180;
 	mode_offboard << COMMAND_ATTITUDE, COMMAND_VELOCITY, COMMAND_ATTITUDE;
 }
 
-void SafeAnafi::referenceCommandCallback(const anafi_autonomy::msg::ReferenceCommand& command_msg){
+void Autonomy::referenceCommandCallback(const anafi_autonomy::msg::ReferenceCommand& command_msg){
 	command_offboard <<	(command_msg.horizontal_mode == COMMAND_NONE ? command_offboard(0) : command_msg.x),
 						(command_msg.horizontal_mode == COMMAND_NONE ? command_offboard(1) : command_msg.y),
 						(command_msg.vertical_mode == COMMAND_NONE ? command_offboard(2) : command_msg.z),
@@ -537,44 +539,43 @@ void SafeAnafi::referenceCommandCallback(const anafi_autonomy::msg::ReferenceCom
 	mode_offboard << command_msg.horizontal_mode, command_msg.vertical_mode, command_msg.heading_mode;
 }
 
-void SafeAnafi::derivativeCommandCallback(const anafi_autonomy::msg::VelocityCommand& derivative_msg){
-	derivative_command << cos(yaw)*derivative_msg.vx - sin(yaw)*derivative_msg.vy, sin(yaw)*derivative_msg.vx + cos(yaw)*derivative_msg.vy, derivative_msg.vz, derivative_msg.yaw_rate;
+void Autonomy::derivativeCommandCallback(const anafi_autonomy::msg::VelocityCommand& derivative_msg){
+	derivative_command << derivative_msg.vx, derivative_msg.vy, derivative_msg.vz, derivative_msg.yaw_rate;
 }
 
-void SafeAnafi::referenceGimbalCallback(const geometry_msgs::msg::Vector3& command_msg){
+void Autonomy::referenceGimbalCallback(const geometry_msgs::msg::Vector3& command_msg){
 	offboard_gimbal_command << command_msg.x, command_msg.y, command_msg.z;
 }
 
-void SafeAnafi::referenceZoomCallback(const std_msgs::msg::Float32& command_msg){
+void Autonomy::referenceZoomCallback(const std_msgs::msg::Float32& command_msg){
 	offboard_zoom_command = command_msg.data; 
 }
 
-void SafeAnafi::stateCallback(const std_msgs::msg::String& state_msg){
+void Autonomy::stateCallback(const std_msgs::msg::String& state_msg){
 	state = resolveState(state_msg.data); // 'LANDED', 'MOTOR_RAMPING', 'USER_TAKEOFF', 'TAKINGOFF', 'HOVERING', 'FLYING', 'LANDING', 'EMERGENCY'
 }
 
-void SafeAnafi::gpsCallback(__attribute__((unused)) const sensor_msgs::msg::NavSatFix& gps_msg){
+void Autonomy::gpsCallback(__attribute__((unused)) const sensor_msgs::msg::NavSatFix& gps_msg){
 	//TODO: Implement this function
 }
 
-void SafeAnafi::altitudeCallback(const std_msgs::msg::Float32& altitude_msg){
+void Autonomy::altitudeCallback(const std_msgs::msg::Float32& altitude_msg){
 	double time = this->get_clock()->now().nanoseconds()/1e9;
 	dt_altitude = time - time_old_altitude;
 	time_old_altitude = time;
 
 	altitude = altitude_msg.data;
 
-	altitude_available = 7; // comes at 30Hz
+	barometer_available = 7; // comes at 30Hz
 }
 
-void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg){
+void Autonomy::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg){
 	double time = quaternion_msg.header.stamp.sec + quaternion_msg.header.stamp.nanosec/1e9;
 
 	tf2::Quaternion q(quaternion_msg.quaternion.x, quaternion_msg.quaternion.y, quaternion_msg.quaternion.z, quaternion_msg.quaternion.w);
 	tf2::Matrix3x3 m(q);
-	double roll, pitch;
+	double roll, pitch, yaw;
 	m.getRPY(roll, pitch, yaw);
-	yaw = denormalizeAngle(yaw, yaw_old);
 	Vector3d orientation(roll, pitch, yaw);
 		
 	nd_orientation.updateMeasurements(orientation, time);
@@ -604,10 +605,11 @@ void SafeAnafi::attitudeCallback(const geometry_msgs::msg::QuaternionStamped& qu
 	imu_msg.linear_acceleration.z = linear_acceleration(2);
 	imu_publisher->publish(imu_msg);
 
-	attitude_available = 7; // comes at 30Hz
+	yaw_magnetometer = yaw;
+	magnetometer_available = 7; // comes at 30Hz
 }
 
-void SafeAnafi::gimbalCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg){
+void Autonomy::gimbalCallback(const geometry_msgs::msg::QuaternionStamped& quaternion_msg){
 	double time = quaternion_msg.header.stamp.sec + quaternion_msg.header.stamp.nanosec/1e9;
 
 	quaternion_gimbal = Quaterniond(quaternion_msg.quaternion.w, quaternion_msg.quaternion.x, quaternion_msg.quaternion.y, quaternion_msg.quaternion.z);
@@ -634,7 +636,7 @@ void SafeAnafi::gimbalCallback(const geometry_msgs::msg::QuaternionStamped& quat
 	camera_imu_publisher->publish(imu_msg);
 }
 
-void SafeAnafi::camera_imu_fast_callback(){ // FOR ORB_SLAM
+void Autonomy::camera_imu_fast_callback(){ // FOR ORB_SLAM
 	if(nd_quaternion_camera.getTime() == DBL_MAX) // don't publish before the first attitude arrives 
 		return;
 
@@ -680,7 +682,7 @@ void SafeAnafi::camera_imu_fast_callback(){ // FOR ORB_SLAM
 	camera_imu_fast_publisher->publish(imu_msg);
 }
 
-void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg){
+void Autonomy::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg){
 	double time = speed_msg.header.stamp.sec + speed_msg.header.stamp.nanosec/1e9;
 
 	velocity_optical << speed_msg.vector.x, speed_msg.vector.y, speed_msg.vector.z;
@@ -698,7 +700,7 @@ void SafeAnafi::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_ms
 	optical_available = 7; // comes at 30Hz
 }
 
-void SafeAnafi::mocapCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
+void Autonomy::mocapCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	double time = pose_msg.header.stamp.sec + pose_msg.header.stamp.nanosec/1e9;
 	dt_mocap = time - time_old_mocap;
 
@@ -708,12 +710,13 @@ void SafeAnafi::mocapCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	tf2::Matrix3x3 m(q);
 	double roll, pitch, yaw;
 	m.getRPY(roll, pitch, yaw);
-	yaw = denormalizeAngle(yaw, yaw_old);
 	Vector3d orientation(roll, pitch, yaw);
 		
 	nd_position.updateMeasurements(position_mocap, time);
 	velocity_mocap = nd_position.getDerivative();
-	
+
+	velocity_mocap << rotateVector(velocity_mocap.head(2), yaw), velocity_mocap(2); // rotate velocity from mocap frame to body frame
+
 	nd_orientation_mocap.updateMeasurements(orientation, time);
 	Vector3d rates = nd_orientation_mocap.getDerivative();
 
@@ -730,14 +733,15 @@ void SafeAnafi::mocapCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	t.angular.z = rates(2);
 	odometry_publisher->publish(odometry_msg);
 
-	acceleration_mocap = nd_position.getSecondDerivative();
+	acceleration_mocap = acceleration_optical;//nd_position.getSecondDerivative();
 
 	time_old_mocap = time;
 
+	yaw_mocap = yaw;
 	mocap_available = 2; // comes at 100Hz
 }
 
-void SafeAnafi::cameraPoseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
+void Autonomy::cameraPoseCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 	double time = pose_msg.header.stamp.sec + pose_msg.header.stamp.nanosec/1e9;
 	dt_vision = time - time_old_vision;
 		
@@ -759,7 +763,7 @@ void SafeAnafi::cameraPoseCallback(const geometry_msgs::msg::PoseStamped& pose_m
 	vision_available = 7; // comes at 30Hz
 }
 
-void SafeAnafi::initialize_visual_odometry(){
+void Autonomy::initialize_visual_odometry(){
 	RCLCPP_INFO(this->get_logger(), "Start Visual-Odometry initialization!");
 	double altitude1 = altitude;
 	double z1 = position_vision(2);
@@ -779,12 +783,16 @@ void SafeAnafi::initialize_visual_odometry(){
 	rclcpp::sleep_for(100ms);
 	double altitude3 = altitude;
 	double z3 = position_vision(2);
-	scale = ((altitude2 - altitude1)/(z2 - z1) + (altitude3 - altitude2)/(z3 - z2))/2;
-	RCLCPP_INFO_STREAM(this->get_logger(), "Visual-Odometry initialized with scale = " << scale);
+	if((z2 - z1 != 0) && (z3 - z2 != 0)){
+		scale = ((altitude2 - altitude1)/(z2 - z1) + (altitude3 - altitude2)/(z3 - z2))/2;
+		RCLCPP_INFO_STREAM(this->get_logger(), "Visual-Odometry initialized with scale = " << scale);
+	}
+	else
+		RCLCPP_INFO(this->get_logger(), "Visual-Odometry not initialized!");
 }
 
-void SafeAnafi::stateMachine(){
-	Actions action =(action_keyboard != NONE ? action_keyboard : action_offboard);
+void Autonomy::stateMachine(){
+	Actions action = (action_keyboard != NONE ? action_keyboard : action_offboard);
 	action_keyboard = NONE;
 	action_offboard = NONE;
 
@@ -807,7 +815,7 @@ void SafeAnafi::stateMachine(){
 		break;
 	case INITIALIZE_VIO:
 		if(vision_available > 0){ 
-			thread_initialize_vo = std::thread(&SafeAnafi::initialize_visual_odometry, this);
+			thread_initialize_vo = std::thread(&Autonomy::initialize_visual_odometry, this);
 			thread_initialize_vo.detach();
 		}else
 			RCLCPP_WARN_STREAM(this->get_logger(), "No Visual-Odometry available.");
@@ -995,7 +1003,7 @@ void SafeAnafi::stateMachine(){
 	}
 }
 
-States SafeAnafi::resolveState(std::string input){
+States Autonomy::resolveState(std::string input){
 	if(input == "LANDED") return LANDED;
 	if(input == "MOTOR_RAMPING") return MOTOR_RAMPING;
 	if(input == "USER_TAKEOFF") return USER_TAKEOFF;
@@ -1007,8 +1015,9 @@ States SafeAnafi::resolveState(std::string input){
 	return INVALID;
 }
 
-void SafeAnafi::controllers(){
+void Autonomy::controllers(){
 	Vector4d command_move;
+	command_move.head(2) = (*controller).controlHorizontalVelocity(command_move.head(2), velocity.head(2), acceleration.head(2));
 	// Select control input (priority: skycontroller > keyboard > offboard)
 	command_move << (mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(0) : 0))),
 					(mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(1) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(1) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(1) : 0))),
@@ -1019,7 +1028,6 @@ void SafeAnafi::controllers(){
 	mode_move << 	(mode_skycontroller(0) != COMMAND_NONE ? mode_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? mode_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? mode_offboard(0) : (!isnan(velocity(0)) ? COMMAND_VELOCITY : COMMAND_ATTITUDE)))),
 				 	(mode_skycontroller(1) != COMMAND_NONE ? mode_skycontroller(1) : (mode_keyboard(1) != COMMAND_NONE ? mode_keyboard(1) : (mode_offboard(1) != COMMAND_NONE ? mode_offboard(1) : COMMAND_VELOCITY))),
 				 	(mode_skycontroller(2) != COMMAND_NONE ? mode_skycontroller(2) : (mode_keyboard(2) != COMMAND_NONE ? mode_keyboard(2) : (mode_offboard(2) != COMMAND_NONE ? mode_offboard(2) : COMMAND_RATE)));
-			
 					
 	geometry_msgs::msg::Vector3Stamped mode_msg; // FOR DEBUG
 	mode_msg.header.stamp = this->get_clock()->now(); // FOR DEBUG
@@ -1043,7 +1051,19 @@ void SafeAnafi::controllers(){
 		if(!isnan(position(0)) && !isnan(position(1)) && !isnan(velocity(0)) && !isnan(velocity(1))){
 			command_move(0) = BOUND(command_move(0), bounds(0,0), bounds(0,1));
 			command_move(1) = BOUND(command_move(1), bounds(1,0), bounds(1,1));
-			// TODO: IMPLEMENT POSITION CONTROLLER HERE
+
+			//command_move.head(2) = (*controller).controlHorizontalPosition(command_move.head(2), position.head(2), derivative_command.head(2), velocity.head(2), dt(0));
+		
+			Vector2d position_error;
+			Vector2d position_error_d;
+			position_error = command_move.head(2) - position.head(2);
+			position_error_d = derivative_command.head(2) - rotateVector(velocity.head(2), -yaw); // rotate velocity from body frame to world frame
+						
+			position_error_i(0) = BOUND(position_error_i(0) + position_error(0)*dt(0), max_position_i);
+			position_error_i(1) = BOUND(position_error_i(1) + position_error(1)*dt(0), max_position_i);
+
+			command_move(0) = k_position_p*position_error(0) + k_position_i*position_error_i(0) + k_position_d*position_error_d(0);
+			command_move(1) = k_position_p*position_error(1) + k_position_i*position_error_i(1) + k_position_d*position_error_d(1);
 		}
 		else{
 			command_move(0) = 0;
@@ -1053,17 +1073,20 @@ void SafeAnafi::controllers(){
 		[[fallthrough]];
 	case COMMAND_VELOCITY: // velocity
 		if(!isnan(velocity(0)) && !isnan(velocity(1)) && !isnan(acceleration(0)) && !isnan(acceleration(1))){
-			command_move(0) = BOUND(command_move(0), max_horizontal_speed);
-			command_move(1) = BOUND(command_move(1), max_horizontal_speed);
+			double v = sqrt(pow(command_move(0), 2) + pow(command_move(0), 2));
+			if(v > max_horizontal_speed)
+				command_move.head(2) = command_move.head(2)/v*max_horizontal_speed; // bound velocity
 
-			if(fixed_frame)
-				command_move << cos(yaw)*command_move(0) + sin(yaw)*command_move(1), -sin(yaw)*command_move(0) + cos(yaw)*command_move(1), command_move(2), command_move(3); // rotate command from world frame to body frame
+			if(fixed_frame || mode_move(MODE_HORIZONTAL) == COMMAND_POSITION)
+				command_move.head(2) = rotateVector(command_move.head(2), yaw); // rotate velocity from world frame to body frame
 
+			//command_move.head(2) = (*controller).controlHorizontalVelocity(command_move.head(2), velocity.head(2), acceleration.head(2));
+			
 			Vector2d velocity_error(command_move(0) - velocity(0), command_move(1) - velocity(1));
 			Vector2d velocity_error_d(-acceleration(0), -acceleration(1));
-
-			command_move(0) = -(k_p_velocity*velocity_error(1) + k_d_velocity*velocity_error_d(1));
-			command_move(1) =   k_p_velocity*velocity_error(0) + k_d_velocity*velocity_error_d(0);
+	
+			command_move(0) = -(k_velocity_p*velocity_error(1) + k_velocity_d*velocity_error_d(1));
+			command_move(1) =   k_velocity_p*velocity_error(0) + k_velocity_d*velocity_error_d(0);
 		}else{
 			command_move(0) = 0;
 			command_move(1) = 0;
@@ -1090,10 +1113,13 @@ void SafeAnafi::controllers(){
 	case COMMAND_POSITION: // position
 		if(!isnan(position(2)) && !isnan(velocity(2))){
 			command_move(2) = BOUND(command_move(2), bounds(2,0), bounds(2,1));
+
+			//command_move(2) = (*controller).controlVerticalPosition(command_move(2), position(2), derivative_command(2), velocity(2), dt(1));
+
 			double position_error = command_move(2) - position(2);
 			double position_error_d = derivative_command(2) - velocity(2);
-			position_error_i(2) = BOUND(position_error_i(2) + position_error*dt(1), max_i_position);
-			command_move(2) = k_p_position*position_error + k_i_position*position_error_i(2) + k_d_position*position_error_d;
+			position_error_i(2) = BOUND(position_error_i(2) + position_error*dt(1), max_position_i);
+			command_move(2) = k_position_p*position_error + k_position_i*position_error_i(2) + k_position_d*position_error_d;
 		}else{
 			command_move(2) = 0;
 			RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *get_clock(), 1000, "No altitude feedback.");
@@ -1124,9 +1150,11 @@ void SafeAnafi::controllers(){
 		rpyg_msg.yaw = 0;
 		break;
 	case COMMAND_ATTITUDE: // attitude
-		if(attitude_available > 0){
+		if(!isnan(yaw)){
+			//command_move(3) = (*controller).controlYawOrientation(command_move(3), yaw, 0, 0);
+
 			yaw = denormalizeAngle(yaw, command_move(3));
-			command_move(3) = k_p_yaw*(command_move(3) - yaw);
+			command_move(3) = k_yaw_p*(command_move(3) - yaw);
 		}else{
 			command_move(3) = 0;
 			RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *get_clock(), 1000, "No attitude feedback.");
@@ -1146,7 +1174,7 @@ void SafeAnafi::controllers(){
 	rpyg_publisher->publish(rpyg_msg);
 }
 
-void SafeAnafi::controllerCamera(){
+void Autonomy::controllerCamera(){
 	// Move gimbal
 	Vector3d gimbal_command;
 	gimbal_command <<	(controller_gimbal_command(0) != 0 ?  controller_gimbal_command(0) : (keyboard_gimbal_command(0) != 0 ? keyboard_gimbal_command(0) : offboard_gimbal_command(0))),
@@ -1190,19 +1218,24 @@ void SafeAnafi::controllerCamera(){
 		}	
 }
 
-double SafeAnafi::denormalizeAngle(double a1, double a2){
+double Autonomy::denormalizeAngle(double a1, double a2){
 	while(abs(a1 - a2) > M_PI)
 		a1 += (a1 < a2) ? 2*M_PI : -2*M_PI;
 	return a1;
 }
 
+Vector2d Autonomy::rotateVector(Vector2d v, double a){
+	Vector2d v_rotated;
+	v_rotated << cos(a)*v(0) + sin(a)*v(1), -sin(a)*v(0) + cos(a)*v(1);
+	return v_rotated;
+}
 
 int main(int argc, char** argv){	
 	rclcpp::init(argc, argv);
 	
-	rclcpp::spin(std::make_shared<SafeAnafi>());
+	rclcpp::spin(std::make_shared<Autonomy>());
 	
-	RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "SafeAnafi is stopping...");
+	RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Autonomy is stopping...");
 
 	rclcpp::shutdown();
 	return 0;

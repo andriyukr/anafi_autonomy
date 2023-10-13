@@ -31,10 +31,10 @@ def generate_launch_description():
 		default_value='ai',  # {'4k', 'thermal', 'usa', 'ai'}
 		description='Model of the drone')
 	
-	safe_anafi_include = IncludeLaunchDescription(
+	anafi_autonomy_include = IncludeLaunchDescription(
 		PythonLaunchDescriptionSource([
 			os.path.join(get_package_share_directory('anafi_autonomy')), 
-			'/launch/safe_anafi_launch.py'
+			'/launch/anafi_autonomy_launch.py'
 		]),
 		launch_arguments={
 			'drone/model': LaunchConfiguration('model'),
@@ -42,11 +42,11 @@ def generate_launch_description():
 		}.items()
 	)
 	
-	teleop_key_node = Node(
+	keyboard_node = Node(
 		package='anafi_autonomy',
 		namespace=LaunchConfiguration('namespace'),
-		executable='teleop_key',
-		name='teleop_key',
+		executable='keyboard',
+		name='keyboard',
 		output="screen",
 		emulate_tty=True,
 		prefix='xterm -e',
@@ -57,6 +57,6 @@ def generate_launch_description():
 		namespace_arg,
 		ip_arg,
 		model_arg,
-		safe_anafi_include,
-		teleop_key_node
+		anafi_autonomy_include,
+		keyboard_node
 	])

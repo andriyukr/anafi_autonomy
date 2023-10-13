@@ -27,7 +27,6 @@ set(msg_files
 	"msg/VelocityCommand.msg"
 	"msg/AttitudeCommand.msg"
 	"msg/KeyboardCommand.msg"
-	"msg/Position.msg"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -45,8 +44,11 @@ include_directories(
 	${EIGEN3_INCLUDE_DIRS}
 )
 
-add_executable(safe_anafi src/safeAnafi.cpp)
-ament_target_dependencies(safe_anafi 
+add_executable(autonomy 
+	src/autonomy.cpp
+	src/PIDController.cpp
+)
+ament_target_dependencies(autonomy 
 	rclcpp 
 	std_msgs
 	geometry_msgs
@@ -55,14 +57,14 @@ ament_target_dependencies(safe_anafi
 	std_srvs
 	tf2
 	anafi_ros_interfaces)
-target_link_libraries(safe_anafi "${cpp_typesupport_target}")
+target_link_libraries(autonomy "${cpp_typesupport_target}")
 
-add_executable(teleop_key src/teleopKey.cpp)
-ament_target_dependencies(teleop_key 
+add_executable(keyboard src/keyboard.cpp)
+ament_target_dependencies(keyboard 
 	rclcpp 
 	std_msgs
 	geometry_msgs)
-target_link_libraries(teleop_key "${cpp_typesupport_target}")
+target_link_libraries(keyboard "${cpp_typesupport_target}")
 
 add_executable(trajectory src/trajectory.cpp)
 ament_target_dependencies(trajectory 
@@ -78,8 +80,8 @@ ament_target_dependencies(example
 target_link_libraries(example "${cpp_typesupport_target}")
 
 install(TARGETS
-	safe_anafi
-	teleop_key
+	autonomy
+	keyboard
 	trajectory
 	example
 	DESTINATION lib/${PROJECT_NAME})

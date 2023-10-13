@@ -130,6 +130,9 @@ rcl_interfaces::msg::SetParametersResult Trajectory::parameterCallback(const std
 			file_waypoints = parameter.as_string();
 	}
 
+	changed = true;
+	initial_t = this->get_clock()->now().nanoseconds()/1e9;
+
 	return result;
 }
 
@@ -141,44 +144,52 @@ void Trajectory::timer_callback(){
 
 	switch(trajectory_type){
 	case 0: // no command
+		if(!changed) // publish no command only once
+			return;
 		command << 0, 0, 0, 0;
 		derivative << 0, 0, 0, 0;
 		mode << COMMAND_NONE, COMMAND_NONE, COMMAND_NONE;
-		return;
 		break;
 	case 1: // hover
+		if(!changed)
+			return;
 		command << 0, 0, 1, pose_d(3);
 		derivative << 0, 0, 0, 0;
 		mode << COMMAND_VELOCITY, COMMAND_POSITION, COMMAND_ATTITUDE;
 		break;
 	case 2: // user
+		if(!changed)
+			return;
 		command = pose_d;
 		derivative << 0, 0, 0, 0;
 		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ATTITUDE;
 		break;
 	case 3: // waypoints
 		if(t == 0)
-			RCLCPP_INFO_STREAM(rclcpp::get_logger("rclcpp"), "waypoint #" << waypoint << ": " << ROUND(command));
+			RCLCPP_INFO_STREAM(this->get_logger(), "waypoint #" << waypoint << ": " << ROUND(command));
 		if(waypoint < waypoints.rows() - 1){
 			w1 << waypoints.row(waypoint).transpose();
 			w2 << waypoints.row(waypoint + 1).transpose();
 			double d = distance(w1, w2);
-			command << (1 - t/d)*w1 + t/d*w2;
-			derivative << (w2 - w1)/d*speed;
-			if(t >= d){
-				t = 0;
+			if(d == 0) // w1 == w2
+				d = t*speed;
+			command = (1 - t*speed/d)*w1 + t*speed/d*w2;
+			derivative = (w2 - w1)*speed/d;
+			if(t*speed >= d){
+				initial_t = this->get_clock()->now().nanoseconds()/1e9;
 				waypoint++;
-				RCLCPP_INFO_STREAM(rclcpp::get_logger("rclcpp"), "waypoint #" << waypoint << ": " << w2.transpose());
+				RCLCPP_INFO_STREAM(this->get_logger(), "waypoint #" << waypoint << ": " << w2.transpose());
 			}
 		}
 		else{
 			command << waypoints.bottomRows(1).transpose();
 			derivative << 0, 0, 0, 0;
 		}
+		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ATTITUDE;
 		break;
 	case 4: // circle
-		command << scale*sin(speed*t/scale) + pose_d(0), scale*cos(speed*t/scale) + pose_d(1), pose_d(2), pose_d(3);
-		derivative << speed*cos(speed*t/scale), -speed*sin(speed*t/scale), 0, 0;
+		command << scale*cos(t*speed/sqrt(2)/scale) + pose_d(0), scale*sin(t*speed/sqrt(2)/scale) + pose_d(1), pose_d(2), t*speed/sqrt(2)/scale/M_PI*180 + pose_d(3);
+		derivative << -speed/sqrt(2)*sin(speed*t/scale), speed/sqrt(2)*cos(speed*t/scale), 0, 0;
 		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ATTITUDE;
 		break;
 	case 5: // controller tunning
@@ -186,6 +197,11 @@ void Trajectory::timer_callback(){
 		mode << COMMAND_VELOCITY, COMMAND_VELOCITY, COMMAND_ATTITUDE;
 		break;
 	}
+
+	changed = false;
+
+	while(abs(command(3)) > 180)
+		command(3) += (command(3) < 0) ? 360 : -360;
 
 	// Publish the corresponding reference for each axis
 	command_msg.header.stamp = this->get_clock()->now();
@@ -236,11 +252,11 @@ void Trajectory::readWaypoints(std::string fileName){
         }
         myfile.close();
 
-        RCLCPP_INFO_STREAM(rclcpp::get_logger("rclcpp"), "File with waypoints loaded: " << fileName);
-        RCLCPP_DEBUG_STREAM(rclcpp::get_logger("rclcpp"), "waypoints:\n" << waypoints);
+        RCLCPP_INFO_STREAM(this->get_logger(), "File with waypoints loaded: " << fileName);
+        RCLCPP_DEBUG_STREAM(this->get_logger(), "waypoints:\n" << waypoints);
     }
     else
-        RCLCPP_WARN_STREAM(rclcpp::get_logger("rclcpp"), "Unable to open file with waypoints: " << fileName);
+        RCLCPP_WARN_STREAM(this->get_logger(), "Unable to open file with waypoints: " << fileName);
 }
 
 int main(int argc, char** argv){

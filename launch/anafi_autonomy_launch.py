@@ -1,10 +1,10 @@
 # Usage: 
 # 	- connection through Skycontroller [recommended]:
-# 		ros2 launch anafi_autonomy safe_anafi_launch.py
+# 		ros2 launch anafi_autonomy anafi_autonomy_launch.py
 #	- direct connection to Anafi:
-# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='192.168.42.1' model:='ai'
+# 		ros2 launch anafi_autonomy anafi_autonomy_launch.py ip:='192.168.42.1' model:='ai'
 #	- connection to the simulated drone in Sphinx:
-# 		ros2 launch anafi_autonomy safe_anafi_launch.py ip:='10.202.0.1' model:='ai'
+# 		ros2 launch anafi_autonomy anafi_autonomy_launch.py ip:='10.202.0.1' model:='ai'
 
 import os
 
@@ -42,9 +42,9 @@ def generate_launch_description():
 		}.items()
 	)
 	
-	safe_anafi_config = os.path.join(
+	autonomy_config = os.path.join(
 		get_package_share_directory('anafi_autonomy'),
-		'config/params_safe_anafi.yaml'
+		'config/params_autonomy.yaml'
 	)
 	
 	trajectory_config = os.path.join(
@@ -52,24 +52,23 @@ def generate_launch_description():
 		'config/params_trajectory.yaml'
 	)
 	
-	safe_anafi_node = Node(
+	autonomy_node = Node(
 		package='anafi_autonomy',
 		namespace=LaunchConfiguration('namespace'),
-		executable='safe_anafi',
-		name='safe_anafi',
+		executable='autonomy',
+		name='autonomy',
 		output="screen",
 		emulate_tty=True,
-		arguments=['--ros-args', '--params-file', safe_anafi_config, '--log-level', 'INFO'],
+		arguments=['--ros-args', '--params-file', autonomy_config, '--log-level', 'INFO'],
 		parameters=[
 			{'bounds/x/min': -1.0},
-			{'bounds/x/max': 1.0},
 			{'bounds/y/min': -1.0}, 
 			{'bounds/y/max': 1.0},
 			{'bounds/z/min': 0.0}, 
 			{'bounds/z/max': 2.0} 
 		]
 	)
-	
+		
 	trajectory_node = Node(
 		package='anafi_autonomy',
 		namespace=LaunchConfiguration('namespace'),
@@ -100,7 +99,7 @@ def generate_launch_description():
 		ip_arg,
 		model_arg,
 		anafi_include,
-		safe_anafi_node,
+		autonomy_node,
 		trajectory_node,
 		rqt_image_view_node,
 		rqt_reconfigure_node

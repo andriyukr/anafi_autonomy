@@ -38,6 +38,7 @@ class Trajectory : public rclcpp::Node{
 		rclcpp::Publisher<anafi_autonomy::msg::VelocityCommand>::SharedPtr derivative_publisher;
 
 		// Variables
+		bool changed = false;
 		Vector4d command = Vector4d::Zero();
 		Vector4d derivative = Vector4d::Zero();
 		Vector3d mode = Vector3d::Zero();

@@ -1,4 +1,4 @@
-/** *************************** teleopKey.cpp ***************************
+/** *************************** keyboard.cpp ***************************
  *
  * This code converts the keyboard inputs from user into different functions
  *
@@ -71,10 +71,10 @@ int kfd = 0;
 unsigned long int key = 0;
 struct termios cooked, raw;
 
-class Teleop : public rclcpp::Node{
+class Keyboard : public rclcpp::Node{
 	public:
 		// Constructor
-		Teleop() : Node("keyboard_teleop"){
+		Keyboard() : Node("keyboard"){
 			RCLCPP_INFO(this->get_logger(), "Keyboard is running...");
 			
 			cout <<	"Press: \n"
@@ -96,7 +96,7 @@ class Teleop : public rclcpp::Node{
 		
 			command_publisher = this->create_publisher<anafi_autonomy::msg::KeyboardCommand>("keyboard/command", rclcpp::SystemDefaultsQoS());
 						
-			timer = this->create_wall_timer(70ms, std::bind(&Teleop::timer_callback, this));
+			timer = this->create_wall_timer(70ms, std::bind(&Keyboard::timer_callback, this));
 		}
 		
 	private:		
@@ -277,7 +277,7 @@ int main(int argc, char** argv){
 	signal(SIGINT, quit);
 	rclcpp::init(argc, argv);
 	
-	rclcpp::spin(std::make_shared<Teleop>());
+	rclcpp::spin(std::make_shared<Keyboard>());
 	
 	RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Keyboard is stopping...");
 	tcsetattr(kfd, TCSANOW, &cooked);
