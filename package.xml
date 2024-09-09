@@ -15,7 +15,6 @@
   
 	<exec_depend>rosidl_default_runtime</exec_depend>
   
-	<depend>dynamic_reconfigure</depend>
 	<depend>rclcpp</depend>
 	<depend>std_msgs</depend>
 	<depend>geometry_msgs</depend>
