@@ -32,6 +32,7 @@ To build from source, clone the latest version from this repository into your RO
     sudo chmod -R 777 anafi_autonomy/
     cd ..
     colcon build
+    source install/setup.bash
 
 ## Usage
 
