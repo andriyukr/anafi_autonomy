@@ -13,7 +13,7 @@ This is research code, expect that it changes often and any fitness for a partic
 
 ## Installation
 
-This package has been tested with **python3** in **ROS2 Humble**/**Ubuntu 22.04**.
+This package has been tested with **python3** in **ROS2 Humble**/**Ubuntu 22.04** (*recommended*) and **ROS2 Jazzy**/**Ubuntu 24.04**.
 
 ### Dependencies
 
