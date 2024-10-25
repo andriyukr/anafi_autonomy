@@ -57,7 +57,7 @@ ament_target_dependencies(autonomy
 	std_srvs
 	tf2
 	anafi_ros_interfaces)
-target_link_libraries(autonomy "${cpp_typesupport_target}")
+target_link_libraries(autonomy "${cpp_typesupport_target}" ament_index_cpp::ament_index_cpp)
 
 add_executable(keyboard src/keyboard.cpp)
 ament_target_dependencies(keyboard 
@@ -69,7 +69,7 @@ target_link_libraries(keyboard "${cpp_typesupport_target}")
 add_executable(trajectory src/trajectory.cpp)
 ament_target_dependencies(trajectory 
 	rclcpp)
-target_link_libraries(trajectory "${cpp_typesupport_target}")
+target_link_libraries(trajectory "${cpp_typesupport_target}" ament_index_cpp::ament_index_cpp)
 
 add_executable(example src/example.cpp)
 ament_target_dependencies(example 
