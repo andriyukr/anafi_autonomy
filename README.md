@@ -78,3 +78,7 @@ https://github.com/andriyukr/anafi_autonomy/assets/5682865/d29c227a-b389-4c62-a2
 
 > [!WARNING]
 > To pilot the drone using the keyboard, you must switch to offboard mode. To switch to offboard mode, <ins>press F2 in the action terminal</ins> or <ins>press the zoom reset button on the Skycontroller</ins>.
+
+## Package details
+
+The complete list of [subscribed](details.md#subscribed-topics) and [published](details.md#published-topics) topics, available [services](details.md#services) and [parameters](details.md#parameters) is [here](details.md).
