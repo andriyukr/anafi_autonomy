@@ -27,13 +27,13 @@ Autonomy::Autonomy() : Node("autonomy"){
 	action_subscriber = this->create_subscription<std_msgs::msg::UInt8>("drone/action", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::actionCallback, this, _1));
 	skycontroller_subscriber = this->create_subscription<anafi_ros_interfaces::msg::SkycontrollerCommand>("skycontroller/command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::skycontrollerCallback, this, _1));
 	keyboard_subscriber = this->create_subscription<anafi_autonomy::msg::KeyboardCommand>("keyboard/command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::keyboardCallback, this, _1));
-	reference_pose_subscriber = this->create_subscription<anafi_autonomy::msg::PoseCommand>("drone/reference_pose", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referencePoseCallback, this, _1));
-	reference_velocity_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/reference_velocity", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceVelocityCallback, this, _1));
-	reference_attitude_subscriber = this->create_subscription<anafi_autonomy::msg::AttitudeCommand>("drone/reference_attitude", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceAttitudeCallback, this, _1));
-	reference_command_subscriber = this->create_subscription<anafi_autonomy::msg::ReferenceCommand>("drone/reference_command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceCommandCallback, this, _1));
+	reference_pose_subscriber = this->create_subscription<anafi_autonomy::msg::PoseCommand>("drone/reference/pose", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referencePoseCallback, this, _1));
+	reference_velocity_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/reference/velocity", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceVelocityCallback, this, _1));
+	reference_attitude_subscriber = this->create_subscription<anafi_autonomy::msg::AttitudeCommand>("drone/reference/attitude", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceAttitudeCallback, this, _1));
+	reference_command_subscriber = this->create_subscription<anafi_autonomy::msg::ReferenceCommand>("drone/reference/command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceCommandCallback, this, _1));
 	derivative_command_subscriber = this->create_subscription<anafi_autonomy::msg::VelocityCommand>("drone/derivative_command", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::derivativeCommandCallback, this, _1));
-	reference_gimbal_subscriber = this->create_subscription<geometry_msgs::msg::Vector3>("drone/reference_gimbal", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceGimbalCallback, this, _1));
-	reference_zoom_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/reference_zoom", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceZoomCallback, this, _1));
+	reference_gimbal_subscriber = this->create_subscription<geometry_msgs::msg::Vector3>("gimbal/reference", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceGimbalCallback, this, _1));
+	reference_zoom_subscriber = this->create_subscription<std_msgs::msg::Float32>("zoom/reference", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::referenceZoomCallback, this, _1));
 	state_subscriber = this->create_subscription<std_msgs::msg::String>("drone/state", rclcpp::SystemDefaultsQoS(), std::bind(&Autonomy::stateCallback, this, _1));
 	gps_subscriber = this->create_subscription<sensor_msgs::msg::NavSatFix>("drone/gps/location", rclcpp::SensorDataQoS(), std::bind(&Autonomy::gpsCallback, this, _1));
 	altitude_subscriber = this->create_subscription<std_msgs::msg::Float32>("drone/altitude", rclcpp::SensorDataQoS(), std::bind(&Autonomy::altitudeCallback, this, _1));
@@ -45,8 +45,6 @@ Autonomy::Autonomy() : Node("autonomy"){
 
 	// Publishers
 	rpyg_publisher = this->create_publisher<anafi_ros_interfaces::msg::PilotingCommand>("drone/command", rclcpp::SystemDefaultsQoS());
-	moveto_publisher = this->create_publisher<anafi_ros_interfaces::msg::MoveToCommand>("drone/moveto", rclcpp::SystemDefaultsQoS());
-	moveby_publisher = this->create_publisher<anafi_ros_interfaces::msg::MoveByCommand>("drone/moveby", rclcpp::SystemDefaultsQoS());
 	camera_publisher = this->create_publisher<anafi_ros_interfaces::msg::CameraCommand>("camera/command", rclcpp::SystemDefaultsQoS());
 	gimbal_publisher = this->create_publisher<anafi_ros_interfaces::msg::GimbalCommand>("gimbal/command", rclcpp::SystemDefaultsQoS());
 	odometry_publisher = this->create_publisher<nav_msgs::msg::Odometry>("drone/odometry", rclcpp::SensorDataQoS());
@@ -268,7 +266,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 
 	// Timer
 	timer = this->create_wall_timer(10ms, std::bind(&Autonomy::timer_callback, this));
-	timer_camera_imu_fast = this->create_wall_timer(100ms, std::bind(&Autonomy::camera_imu_fast_callback, this));  // FOR ORB_SLAM
+	timer_camera_imu_fast = this->create_wall_timer(10ms, std::bind(&Autonomy::camera_imu_fast_callback, this));  // FOR ORB_SLAM
 
 	// Parameters client
 	auto parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(this, "anafi");
