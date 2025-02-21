@@ -146,7 +146,7 @@ class Autonomy : public rclcpp::Node{
 		// Clients
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr emergency_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr halt_client;
-		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr arm_client;
+		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr hand_launch_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr takeoff_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr land_client;
 		rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr rth_client;

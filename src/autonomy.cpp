@@ -57,7 +57,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	mode_publisher = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("drone/debug/mode", rclcpp::SystemDefaultsQoS());
 
 	// Services
-	arm_client = this->create_client<std_srvs::srv::SetBool>("drone/arm");
+	hand_launch_client = this->create_client<std_srvs::srv::SetBool>("drone/hand_launch");
 	takeoff_client = this->create_client<std_srvs::srv::Trigger>("drone/takeoff");
 	land_client = this->create_client<std_srvs::srv::Trigger>("drone/land");
 	emergency_client = this->create_client<std_srvs::srv::Trigger>("drone/emergency");
@@ -797,6 +797,7 @@ void Autonomy::stateMachine(){
 	switch(action){ // State-indipendent actions
 	case DISARM: // emergency
 		emergency_client->async_send_request(trigger_request);
+		armed = false;
 		this->set_parameter(rclcpp::Parameter("armed", false));
 		return;
 	case RESET_POSE:
@@ -828,7 +829,7 @@ void Autonomy::stateMachine(){
 		switch(action){
 		case ARM:
 			if(hand_launch){
-				arm_client->async_send_request(true_request);
+				hand_launch_client->async_send_request(true_request);
 				armed = true;
 				this->set_parameter(rclcpp::Parameter("armed", true));
 			}
@@ -877,7 +878,7 @@ void Autonomy::stateMachine(){
 		case ARM: // disarm
 		case LAND:
 		case HALT:
-			arm_client->async_send_request(false_request);
+			hand_launch_client->async_send_request(false_request);
 			armed = false;
 			this->set_parameter(rclcpp::Parameter("armed", false));
 			break;
@@ -890,12 +891,12 @@ void Autonomy::stateMachine(){
 		case ARM: // disarm
 		case LAND:
 		case HALT:
-			arm_client->async_send_request(false_request);
+			hand_launch_client->async_send_request(false_request);
 			armed = false;
 			this->set_parameter(rclcpp::Parameter("armed", false));
 			break;
 		case TAKEOFF:
-			arm_client->async_send_request(false_request); // needs to stop the motors before taking off
+			hand_launch_client->async_send_request(false_request); // needs to stop the motors before taking off
 			takeoff_client->async_send_request(trigger_request);
 			break;
 		default:
@@ -907,6 +908,8 @@ void Autonomy::stateMachine(){
 		case LAND:
 		case HALT:
 			land_client->async_send_request(trigger_request);
+			armed = false;
+			this->set_parameter(rclcpp::Parameter("armed", false));
 			break;
 		default:
 			if(takingoff_control)
