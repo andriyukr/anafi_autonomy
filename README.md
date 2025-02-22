@@ -72,6 +72,25 @@ where
     
 A new window will pop up where commands can be keyed in.
 
+### Manual Flight using Keyboard
+
+1. Arm the drone by pressing <kbd>Ins</kbd> on the keyboard.
+2. Take off by pressing <kbd>T</kbd>.
+3. Switch to offboard mode by pressing <kbd>F2</kbd> or the zoom reset button on the Skycontroller.
+4. To fly the drone, use the following keys:
+   * <kbd>↑</kbd> - move forward
+   * <kbd>↓</kbd> - move backward
+   * <kbd>←</kbd> - move left
+   * <kbd>→</kbd> - move right
+   * <kbd>W</kbd> - move up
+   * <kbd>S</kbd> - move down
+   * <kbd>A</kbd> - yaw counterclockwise
+   * <kbd>D</kbd> - yaw clockwise
+6. Land by pressing <kbd>L</kbd>.
+
+> [!WARNING]
+> To immediately cut off the motors, press <kbd>Esc</kbd>. Use this only in emergency situations!
+
 ### Demonstration Video
 
 https://github.com/andriyukr/anafi_autonomy/assets/5682865/d29c227a-b389-4c62-a23b-3e2a12b1a5fe
