@@ -88,6 +88,10 @@ Autonomy::Autonomy() : Node("autonomy"){
 	recording_request = std::make_shared<anafi_ros_interfaces::srv::Recording::Request>();
 	false_request->data = false;
 	true_request->data = true;
+	
+	// Parameters client
+	parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(this, "anafi");
+	param_events_subscriber = parameters_client->on_parameter_event(std::bind(&Autonomy::parameter_events_callback, this, std::placeholders::_1));
 
 	// Parameters
 	parameters_callback = this->add_on_set_parameters_callback(std::bind(&Autonomy::parameter_callback, this, std::placeholders::_1));
@@ -154,7 +158,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/position/p", 2.0, parameter_descriptor);
+	this->declare_parameter("gains/position/p", 0.3, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Position integral gain";
@@ -163,7 +167,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/position/i", 1.0, parameter_descriptor);
+	this->declare_parameter("gains/position/i", 0.2, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Position derivative gain";
@@ -172,7 +176,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/position/d", 0.5, parameter_descriptor);
+	this->declare_parameter("gains/position/d", 0.1, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Position max integral component";
@@ -190,7 +194,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/velocity/p", 9.1, parameter_descriptor);
+	this->declare_parameter("gains/velocity/p", 1.5, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Velocity derivative gain";
@@ -199,7 +203,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/velocity/d", 1.3, parameter_descriptor);
+	this->declare_parameter("gains/velocity/d", 0.2, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Yaw proportional gain";
@@ -208,7 +212,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 100.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/yaw/p", 70.0, parameter_descriptor);
+	this->declare_parameter("gains/yaw/p", 2.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Min x bound";
@@ -267,10 +271,6 @@ Autonomy::Autonomy() : Node("autonomy"){
 	// Timer
 	timer = this->create_wall_timer(10ms, std::bind(&Autonomy::timer_callback, this));
 	timer_camera_imu_fast = this->create_wall_timer(10ms, std::bind(&Autonomy::camera_imu_fast_callback, this));  // FOR ORB_SLAM
-
-	// Parameters client
-	auto parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(this, "anafi");
-	param_events_subscriber = parameters_client->on_parameter_event(std::bind(&Autonomy::parameter_events_callback, this, std::placeholders::_1));
 }
 
 rcl_interfaces::msg::SetParametersResult Autonomy::parameter_callback(const std::vector<rclcpp::Parameter> &parameters){
@@ -386,6 +386,7 @@ rcl_interfaces::msg::SetParametersResult Autonomy::parameter_callback(const std:
 		if(parameter.get_name() == "bounds/z/max"){
 			bounds(2,1) = parameter.as_double();
 			RCLCPP_DEBUG(this->get_logger(), "Parameter 'bounds_z_max' set to %.1f", bounds(2,1));
+			parameters_client->set_parameters({rclcpp::Parameter("drone/max_altitude", bounds(2,1))});
 			return result;
 		}
 	}
@@ -418,6 +419,10 @@ void Autonomy::parameter_assign(rcl_interfaces::msg::Parameter & parameter){
 		max_tilt = parameter.value.double_value;
 		RCLCPP_DEBUG(this->get_logger(), "Parameter 'drone/max_pitch_roll' set to %.1f", max_tilt);
 	}
+	if(parameter.name == "drone/max_altitude"){
+		if(bounds(2,1) != parameter.value.double_value) // to prevent an infinite loop of parameter setting between "drone/max_altitude" and "bounds/z/max"
+			this->set_parameter(rclcpp::Parameter("bounds/z/max", parameter.value.double_value));
+	}
 }
 
 void Autonomy::timer_callback(){
@@ -444,11 +449,11 @@ void Autonomy::timer_callback(){
 	stateMachine();
 
 	// Consume tokens
-	mocap_available    		= mocap_available > 0    ? mocap_available - 1    : 0;
-	vision_available   		= vision_available > 0   ? vision_available - 1   : 0;
-	barometer_available 	= barometer_available > 0 ? barometer_available - 1 : 0;
-	optical_available  		= optical_available > 0  ? optical_available - 1  : 0;
-	magnetometer_available 	= magnetometer_available > 0 ? magnetometer_available - 1 : 0;
+	mocap_available = mocap_available > 0 ? mocap_available - 1 : 0;
+	vision_available = vision_available > 0 ? vision_available - 1 : 0;
+	barometer_available = barometer_available > 0 ? barometer_available - 1 : 0;
+	optical_available = optical_available > 0 ? optical_available - 1  : 0;
+	magnetometer_available = magnetometer_available > 0 ? magnetometer_available - 1 : 0;
 
 	controllerCamera();
 }
@@ -531,9 +536,9 @@ void Autonomy::referenceAttitudeCallback(const anafi_autonomy::msg::AttitudeComm
 
 void Autonomy::referenceCommandCallback(const anafi_autonomy::msg::ReferenceCommand& command_msg){
 	command_offboard <<	(command_msg.horizontal_mode == COMMAND_NONE ? command_offboard(0) : command_msg.x),
-						(command_msg.horizontal_mode == COMMAND_NONE ? command_offboard(1) : command_msg.y),
-						(command_msg.vertical_mode == COMMAND_NONE ? command_offboard(2) : command_msg.z),
-						(command_msg.heading_mode == COMMAND_NONE ? command_offboard(3) : (command_msg.heading_mode == COMMAND_ATTITUDE ? command_msg.yaw*M_PI/180 : command_msg.yaw));
+				(command_msg.horizontal_mode == COMMAND_NONE ? command_offboard(1) : command_msg.y),
+				(command_msg.vertical_mode == COMMAND_NONE ? command_offboard(2) : command_msg.z),
+				(command_msg.heading_mode == COMMAND_NONE ? command_offboard(3) : (command_msg.heading_mode == COMMAND_ATTITUDE ? command_msg.yaw*M_PI/180 : command_msg.yaw));
 	mode_offboard << command_msg.horizontal_mode, command_msg.vertical_mode, command_msg.heading_mode;
 }
 
@@ -825,7 +830,7 @@ void Autonomy::stateMachine(){
 
 	switch(state){
 	case LANDED:
-	    controllers(); // ONLY FOR GROUND TEST DEBUG
+		controllers(); // ONLY FOR GROUND TEST DEBUG
 		switch(action){
 		case ARM:
 			if(hand_launch){
@@ -1095,6 +1100,8 @@ void Autonomy::controllers(){
 		}
 		[[fallthrough]];
 	case COMMAND_ATTITUDE: // attitude
+		command_move(0) /= M_PI*180;
+		command_move(1) /= M_PI*180;
 		command_move(0) = BOUND(command_move(0), max_tilt);
 		command_move(1) = BOUND(command_move(1), max_tilt);
 		rpyg_msg.roll = command_move(0);
@@ -1162,6 +1169,7 @@ void Autonomy::controllers(){
 		}
 		[[fallthrough]];
 	case COMMAND_RATE: // angular rate
+		command_move(3) /= M_PI*180;
 		command_move(3) = BOUND(command_move(3), max_yaw_rate);
 		rpyg_msg.yaw = command_move(3);
 		break;
@@ -1178,9 +1186,9 @@ void Autonomy::controllers(){
 void Autonomy::controllerCamera(){
 	// Move gimbal
 	Vector3d gimbal_command;
-	gimbal_command <<	(controller_gimbal_command(0) != 0 ?  controller_gimbal_command(0) : (keyboard_gimbal_command(0) != 0 ? keyboard_gimbal_command(0) : offboard_gimbal_command(0))),
-						(controller_gimbal_command(1) != 0 ? -controller_gimbal_command(1) : (keyboard_gimbal_command(1) != 0 ? keyboard_gimbal_command(1) : offboard_gimbal_command(1))),
-						(controller_gimbal_command(2) != 0 ? -controller_gimbal_command(2) : (keyboard_gimbal_command(2) != 0 ? keyboard_gimbal_command(2) : offboard_gimbal_command(2)));
+	gimbal_command << 	(controller_gimbal_command(0) != 0 ?  controller_gimbal_command(0) : (keyboard_gimbal_command(0) != 0 ? keyboard_gimbal_command(0) : offboard_gimbal_command(0))),
+				(controller_gimbal_command(1) != 0 ? -controller_gimbal_command(1) : (keyboard_gimbal_command(1) != 0 ? keyboard_gimbal_command(1) : offboard_gimbal_command(1))),
+				(controller_gimbal_command(2) != 0 ? -controller_gimbal_command(2) : (keyboard_gimbal_command(2) != 0 ? keyboard_gimbal_command(2) : offboard_gimbal_command(2)));
 
 	anafi_ros_interfaces::msg::GimbalCommand gimbal_msg;
 	gimbal_msg.header.stamp = this->get_clock()->now();
