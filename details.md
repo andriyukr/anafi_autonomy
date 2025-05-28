@@ -66,10 +66,10 @@
 | `gains/velocity/p` | `float` | `9.1` | [`0.0`, `10.0`] | Velocity PD controller's proportional gain. |  |
 | `gains/velocity/d` | `float` | `1.3` | [`0.0`, `10.0`] | Velocity PD controller's derivative gain. |  |
 | `gains/yaw/p` | `float` | `70.0` | [`0.0`, `100.0`] | Yaw P controller's proportional gain. |  |
-| `hand_launch | `bool` | `true` | {`true`: enabled, `false`: disabled} | Enable hand launched takeoff. |  |
+| `hand_launch` | `bool` | `true` | {`true`: enabled, `false`: disabled} | Enable hand launched takeoff. |  |
 | `landing_control` | `bool` |  `false` | {`true`: enabled, `false`: disabled} | Enable control during landing. |  |
 | `mission_type` | `int` | `0` | {`0`: flight plan, `1`: follow me} | Mission type. |  |
-| `takingoff_control | `bool` | `false` | {`true`: enabled, `false`: disabled} | Enable control during takeoff. |  |
+| `takingoff_control` | `bool` | `false` | {`true`: enabled, `false`: disabled} | Enable control during takeoff. |  |
 | `world_frame` | `bool` | `false` |  | Yaw aligned with world North. |  |
 
 ## Custom messages
