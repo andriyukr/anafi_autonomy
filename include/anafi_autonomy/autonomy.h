@@ -230,8 +230,7 @@ class Autonomy : public rclcpp::Node{
 		Vector3d velocity;
 		Vector3d velocity_optical;
 		Vector3d velocity_mocap;
-		Vector3d velocity_error_i = Vector3d::Zero();
-
+		
 		// Acceleration
 		Vector3d acceleration;
 		Vector3d acceleration_optical;
@@ -261,11 +260,14 @@ class Autonomy : public rclcpp::Node{
 		double k_position_d = 0;
 		double max_position_i = 0;
 		double k_velocity_p = 0;
+		double k_velocity_i = 0;
 		double k_velocity_d = 0;
+		double max_velocity_i = 0;
 		double k_yaw_p = 0;
 
 		// Error
 		Vector3d position_error_i = Vector3d::Zero();
+		Vector2d velocity_error_i = Vector2d::Zero();
 
 		// Parameters
 		double max_tilt;
@@ -280,6 +282,8 @@ class Autonomy : public rclcpp::Node{
 		Vector2d dt; 
 		double time_old_altitude = 0;
 		double dt_altitude = NAN;
+		double time_old_optical = 0;
+		double dt_optical = NAN;
 		double time_old_position = 0;
 		double dt_position = NAN;
 		double time_old_mocap = 0;

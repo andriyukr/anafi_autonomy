@@ -17,8 +17,12 @@ Trajectory::Trajectory() : Node("trajectory"){
 	command_publisher = this->create_publisher<anafi_autonomy::msg::ReferenceCommand>("drone/reference/command", rclcpp::SystemDefaultsQoS());
 	derivative_publisher = this->create_publisher<anafi_autonomy::msg::VelocityCommand>("drone/derivative_command", rclcpp::SystemDefaultsQoS());
 
+	// Parameters client
+	parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(this, "anafi");
+	param_events_subscriber = parameters_client->on_parameter_event(std::bind(&Trajectory::parameter_events_callback, this, std::placeholders::_1));
+
 	// Parameters
-	callback = this->add_on_set_parameters_callback(std::bind(&Trajectory::parameterCallback, this, std::placeholders::_1));
+	parameters_callback = this->add_on_set_parameters_callback(std::bind(&Trajectory::parameterCallback, this, std::placeholders::_1));
 
 	rcl_interfaces::msg::ParameterDescriptor parameter_descriptor;
 	rcl_interfaces::msg::IntegerRange integer_range;
@@ -28,7 +32,7 @@ Trajectory::Trajectory() : Node("trajectory"){
 	parameter_descriptor.description = 
 		"Trajectory type: "
 		"0 = no trajectory, "
-		"1 = hover at (0, 0, 1, yaw_d), "
+		"1 = hover at (x_current, y_current, 1, yaw_d), "
 		"2 = defined by user with (x_d, y_d, z_d, yaw_d), "
 		"3 = waipoints from file, "
 		"4 = circle"
@@ -122,8 +126,13 @@ rcl_interfaces::msg::SetParametersResult Trajectory::parameterCallback(const std
 			pose_d(2) = parameter.as_double();
 		if(parameter.get_name() == "desired/yaw")
 			pose_d(3) = parameter.as_double();
-		if(parameter.get_name() == "desired/speed")
+		if(parameter.get_name() == "desired/speed"){
 			speed = parameter.as_double();
+			if(speed > max_horizontal_speed)
+				parameters_client->set_parameters({rclcpp::Parameter("drone/max_horizontal_speed", min(speed, 15.0))});
+			if(speed > max_vertical_speed)
+				parameters_client->set_parameters({rclcpp::Parameter("drone/max_vertical_speed", min(speed, 4.0))});
+		}
 		if(parameter.get_name() == "scale")
 			scale = parameter.as_double();
 		if(parameter.get_name() == "waypoints_file")
@@ -134,6 +143,20 @@ rcl_interfaces::msg::SetParametersResult Trajectory::parameterCallback(const std
 	initial_t = this->get_clock()->now().nanoseconds()/1e9;
 
 	return result;
+}
+
+void Trajectory::parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event){
+	for(rcl_interfaces::msg::Parameter & changed_parameter : event->changed_parameters)
+		parameter_assign(changed_parameter);
+	for(rcl_interfaces::msg::Parameter & new_parameter : event->new_parameters)
+		parameter_assign(new_parameter);
+}
+
+void Trajectory::parameter_assign(rcl_interfaces::msg::Parameter & parameter){
+	if(parameter.name == "drone/max_horizontal_speed")
+		max_horizontal_speed = parameter.value.double_value;
+	if(parameter.name == "drone/max_vertical_speed")
+		max_vertical_speed = parameter.value.double_value;
 }
 
 void Trajectory::timer_callback(){
@@ -188,18 +211,15 @@ void Trajectory::timer_callback(){
 		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ATTITUDE;
 		break;
 	case 4: // circle
-		command << scale*cos(t*speed/sqrt(2)/scale) + pose_d(0), scale*sin(t*speed/sqrt(2)/scale) + pose_d(1), pose_d(2), t*speed/sqrt(2)/scale/M_PI*180 + pose_d(3);
+		command << scale*cos(t*speed/sqrt(2)/scale) + pose_d(0), scale*sin(t*speed/sqrt(2)/scale) + pose_d(1), pose_d(2), t*speed/sqrt(2)/scale/M_PI*180 + 90;
 		derivative << -speed/sqrt(2)*sin(speed*t/scale), speed/sqrt(2)*cos(speed*t/scale), 0, 0;
 		mode << COMMAND_POSITION, COMMAND_POSITION, COMMAND_ATTITUDE;
-		break;
-	case 5: // controller tunning
-		command = pose_d;
-		mode << COMMAND_VELOCITY, COMMAND_VELOCITY, COMMAND_ATTITUDE;
 		break;
 	}
 
 	changed = false;
-
+	
+	// Normalise desired yaw between -pi and pi
 	while(abs(command(3)) > 180)
 		command(3) += (command(3) < 0) ? 360 : -360;
 

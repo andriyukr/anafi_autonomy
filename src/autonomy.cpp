@@ -158,7 +158,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/position/p", 0.3, parameter_descriptor);
+	this->declare_parameter("gains/position/p", 2.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Position integral gain";
@@ -167,7 +167,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/position/i", 0.2, parameter_descriptor);
+	this->declare_parameter("gains/position/i", 2.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Position derivative gain";
@@ -176,7 +176,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/position/d", 0.1, parameter_descriptor);
+	this->declare_parameter("gains/position/d", 0.5, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Position max integral component";
@@ -191,10 +191,19 @@ Autonomy::Autonomy() : Node("autonomy"){
 	parameter_descriptor.description = "Velocity proportional gain";
 	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
 	floating_point_range.from_value = 0.0;
+	floating_point_range.to_value = 100.0;
+	floating_point_range.step = 0.0;
+	parameter_descriptor.floating_point_range.push_back(floating_point_range);
+	this->declare_parameter("gains/velocity/p", 20.0, parameter_descriptor);
+	
+	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+	parameter_descriptor.description = "Velocity integral gain";
+	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+	floating_point_range.from_value = 0.0;
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/velocity/p", 1.5, parameter_descriptor);
+	this->declare_parameter("gains/velocity/i", 1.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Velocity derivative gain";
@@ -203,7 +212,16 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 10.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/velocity/d", 0.2, parameter_descriptor);
+	this->declare_parameter("gains/velocity/d", 3.0, parameter_descriptor);
+	
+	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
+	parameter_descriptor.description = "Velocity max integral component";
+	floating_point_range = rcl_interfaces::msg::FloatingPointRange{};
+	floating_point_range.from_value = 0.0;
+	floating_point_range.to_value = 10.0;
+	floating_point_range.step = 0.0;
+	parameter_descriptor.floating_point_range.push_back(floating_point_range);
+	this->declare_parameter("gains/velocity/max_i", 0.5, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Yaw proportional gain";
@@ -212,7 +230,7 @@ Autonomy::Autonomy() : Node("autonomy"){
 	floating_point_range.to_value = 100.0;
 	floating_point_range.step = 0.0;
 	parameter_descriptor.floating_point_range.push_back(floating_point_range);
-	this->declare_parameter("gains/yaw/p", 2.0, parameter_descriptor);
+	this->declare_parameter("gains/yaw/p", 70.0, parameter_descriptor);
 
 	parameter_descriptor = rcl_interfaces::msg::ParameterDescriptor{};
 	parameter_descriptor.description = "Min x bound";
@@ -348,9 +366,19 @@ rcl_interfaces::msg::SetParametersResult Autonomy::parameter_callback(const std:
 			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_velocity_p' set to %.1f", k_velocity_p);
 			return result;
 		}
+		if(parameter.get_name() == "gains/velocity/i"){
+			k_velocity_i = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_velocity_i' set to %.1f", k_velocity_i);
+			return result;
+		}
 		if(parameter.get_name() == "gains/velocity/d"){
 			k_velocity_d = parameter.as_double();
 			RCLCPP_DEBUG(this->get_logger(), "Parameter 'k_velocity_d' set to %.1f", k_velocity_d);
+			return result;
+		}
+		if(parameter.get_name() == "gains/velocity/max_i"){
+			max_velocity_i = parameter.as_double();
+			RCLCPP_DEBUG(this->get_logger(), "Parameter 'max_velocity_i' set to %.1f", max_velocity_i);
 			return result;
 		}
 		if(parameter.get_name() == "gains/yaw/p"){
@@ -443,8 +471,8 @@ void Autonomy::timer_callback(){
 	yaw = (mocap_available > 0 ? yaw_mocap : (magnetometer_available > 0 ? yaw_magnetometer : (vision_available > 0 ? yaw_vision : NAN))); // priority: mocap > magnetometer > vision
 	yaw = denormalizeAngle(yaw, yaw_old);
 	// Select time difference sourse
-	dt << 	(mocap_available > 0 ? dt_mocap : (vision_available > 0 ? dt_vision : NAN)), // priority: mocap > vision
-			(mocap_available > 0 ? dt_mocap : (barometer_available > 0 ? dt_altitude : NAN)); // priority: mocap > onboard
+	dt << 	(mocap_available > 0 ? dt_mocap : (vision_available > 0 ? dt_vision : (optical_available > 0 ? dt_optical : NAN))), // priority: mocap > vision > optical
+		(mocap_available > 0 ? dt_mocap : (barometer_available > 0 ? dt_altitude : NAN)); // priority: mocap > onboard
 
 	stateMachine();
 
@@ -687,6 +715,7 @@ void Autonomy::camera_imu_fast_callback(){ // FOR ORB_SLAM
 
 void Autonomy::speedCallback(const geometry_msgs::msg::Vector3Stamped& speed_msg){
 	double time = speed_msg.header.stamp.sec + speed_msg.header.stamp.nanosec/1e9;
+	dt_optical = time - time_old_optical;
 
 	velocity_optical << speed_msg.vector.x, speed_msg.vector.y, speed_msg.vector.z;
 
@@ -725,18 +754,18 @@ void Autonomy::mocapCallback(const geometry_msgs::msg::PoseStamped& pose_msg){
 
 	nav_msgs::msg::Odometry odometry_msg;
 	odometry_msg.header = pose_msg.header;
+	odometry_msg.header.stamp = this->get_clock()->now();
 	odometry_msg.pose.pose.position = pose_msg.pose.position;
 	odometry_msg.pose.pose.orientation = pose_msg.pose.orientation;
-	geometry_msgs::msg::Twist t;
-	t.linear.x = velocity_mocap(0);
-	t.linear.y = velocity_mocap(1);
-	t.linear.z = velocity_mocap(2);
-	t.angular.x = rates(0);
-	t.angular.y = rates(1);
-	t.angular.z = rates(2);
+	odometry_msg.twist.twist.linear.x = velocity_mocap(0);
+	odometry_msg.twist.twist.linear.y = velocity_mocap(1);
+	odometry_msg.twist.twist.linear.z = velocity_mocap(2);
+	odometry_msg.twist.twist.angular.x = rates(0);
+	odometry_msg.twist.twist.angular.y = rates(1);
+	odometry_msg.twist.twist.angular.z = rates(2);
 	odometry_publisher->publish(odometry_msg);
 
-	acceleration_mocap = acceleration_optical;//nd_position.getSecondDerivative();
+	acceleration_mocap = nd_position.getSecondDerivative();//acceleration_optical;//
 
 	time_old_mocap = time;
 
@@ -1023,7 +1052,7 @@ States Autonomy::resolveState(std::string input){
 
 void Autonomy::controllers(){
 	Vector4d command_move;
-	command_move.head(2) = (*controller).controlHorizontalVelocity(command_move.head(2), velocity.head(2), acceleration.head(2));
+	//command_move.head(2) = (*controller).controlHorizontalVelocity(command_move.head(2), velocity.head(2), acceleration.head(2));
 	// Select control input (priority: skycontroller > keyboard > offboard)
 	command_move << (mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(0) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(0) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(0) : 0))),
 					(mode_skycontroller(0) != COMMAND_NONE ? command_skycontroller(1) : (mode_keyboard(0) != COMMAND_NONE ? command_keyboard(1) : (mode_offboard(0) != COMMAND_NONE ? command_offboard(1) : 0))),
@@ -1090,9 +1119,12 @@ void Autonomy::controllers(){
 			
 			Vector2d velocity_error(command_move(0) - velocity(0), command_move(1) - velocity(1));
 			Vector2d velocity_error_d(-acceleration(0), -acceleration(1));
-	
-			command_move(0) = -(k_velocity_p*velocity_error(1) + k_velocity_d*velocity_error_d(1));
-			command_move(1) =   k_velocity_p*velocity_error(0) + k_velocity_d*velocity_error_d(0);
+			
+			velocity_error_i(0) = BOUND(velocity_error_i(0) + velocity_error(0)*dt(0), max_velocity_i);
+			velocity_error_i(1) = BOUND(velocity_error_i(1) + velocity_error(1)*dt(0), max_velocity_i);
+			
+			command_move(0) = -(k_velocity_p*velocity_error(1) + k_velocity_i*velocity_error_i(1) + k_velocity_d*velocity_error_d(1));
+			command_move(1) =   k_velocity_p*velocity_error(0) + k_velocity_i*velocity_error_i(0) + k_velocity_d*velocity_error_d(0);
 		}else{
 			command_move(0) = 0;
 			command_move(1) = 0;
@@ -1100,8 +1132,8 @@ void Autonomy::controllers(){
 		}
 		[[fallthrough]];
 	case COMMAND_ATTITUDE: // attitude
-		command_move(0) /= M_PI*180;
-		command_move(1) /= M_PI*180;
+		//command_move(0) /= M_PI*180;
+		//command_move(1) /= M_PI*180;
 		command_move(0) = BOUND(command_move(0), max_tilt);
 		command_move(1) = BOUND(command_move(1), max_tilt);
 		rpyg_msg.roll = command_move(0);
@@ -1169,7 +1201,7 @@ void Autonomy::controllers(){
 		}
 		[[fallthrough]];
 	case COMMAND_RATE: // angular rate
-		command_move(3) /= M_PI*180;
+		//command_move(3) /= M_PI*180;
 		command_move(3) = BOUND(command_move(3), max_yaw_rate);
 		rpyg_msg.yaw = command_move(3);
 		break;

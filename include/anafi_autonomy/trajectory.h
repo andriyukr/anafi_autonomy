@@ -31,12 +31,17 @@ class Trajectory : public rclcpp::Node{
 		rclcpp::TimerBase::SharedPtr timer;
 		
 		// Callback
-		OnSetParametersCallbackHandle::SharedPtr callback;
+		OnSetParametersCallbackHandle::SharedPtr parameters_callback;
+		void parameter_events_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
 		
 		// Publishers
 		rclcpp::Publisher<anafi_autonomy::msg::ReferenceCommand>::SharedPtr command_publisher;
 		rclcpp::Publisher<anafi_autonomy::msg::VelocityCommand>::SharedPtr derivative_publisher;
-
+		
+		// Parameter client
+		rclcpp::AsyncParametersClient::SharedPtr parameters_client;
+		rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr param_events_subscriber;		
+		
 		// Variables
 		bool changed = false;
 		Vector4d command = Vector4d::Zero();
@@ -52,12 +57,15 @@ class Trajectory : public rclcpp::Node{
 		Vector4d w1;
 		Vector4d w2;
 		int waypoint = 0;
+		double max_vertical_speed = 10;
+		double max_horizontal_speed = 10;
 
 		// Callback
 		void timer_callback();
 		rcl_interfaces::msg::SetParametersResult parameterCallback(const std::vector<rclcpp::Parameter> &parameters);
 
 		// Functions
+		void parameter_assign(rcl_interfaces::msg::Parameter &parameter);
 		void readWaypoints(std::string fileName);
 		double distance(Vector4d v1, Vector4d v2);
 };
