@@ -4,8 +4,8 @@ This ROS2 package contains an interface to control drones from the Parrot Anafi 
 ## Overview
 
 **Author:** Andriy Sarabakha<br />
-**Affiliation:** [Nanyang Technological University (NTU)](https://www.ntu.edu.sg), Singapore<br />
-**Maintainer:** Andriy Sarabakha, andriy.sarabakha@ntu.edu.sg
+**Affiliation:** [Aarhus University](https://international.au.dk/), Denmark<br />
+**Maintainer:** Andriy Sarabakha, andriy@ece.au.dk
 
 **Keywords:** Parrot, UAV, controller
 
@@ -91,12 +91,12 @@ A new window will pop up where commands can be keyed in.
 > [!WARNING]
 > To immediately cut off the motors, press <kbd>Esc</kbd>. Use this only in emergency situations!
 
+> [!WARNING]
+> To pilot the drone using the keyboard, you must switch to offboard mode. To switch to offboard mode, <ins>press <kbd>F2</kbd> in the action terminal</ins> or <ins>press the zoom reset button on the Skycontroller</ins>.
+
 ### Demonstration Video
 
 https://github.com/andriyukr/anafi_autonomy/assets/5682865/d29c227a-b389-4c62-a23b-3e2a12b1a5fe
-
-> [!WARNING]
-> To pilot the drone using the keyboard, you must switch to offboard mode. To switch to offboard mode, <ins>press F2 in the action terminal</ins> or <ins>press the zoom reset button on the Skycontroller</ins>.
 
 ## Package details
 
