@@ -40,7 +40,7 @@ To build from source, clone the latest version from this repository into your RO
 
 To control the drone,
 
-1. in the terminal 1, run:
+1. in terminal 1, run:
 
        ros2 launch anafi_autonomy anafi_autonomy_launch.py ip:='192.168.53.1' model:='ai'
          
@@ -94,9 +94,13 @@ A new window will pop up where commands can be keyed in.
 > [!WARNING]
 > To pilot the drone using the keyboard, you must switch to offboard mode. To switch to offboard mode, <ins>press <kbd>F2</kbd> in the action terminal</ins> or <ins>press the zoom reset button on the Skycontroller</ins>.
 
-### Demonstration Video
+### Manual Flight
 
 https://github.com/andriyukr/anafi_autonomy/assets/5682865/d29c227a-b389-4c62-a23b-3e2a12b1a5fe
+
+### Autonomous Flight
+
+https://github.com/user-attachments/assets/61513246-3b3f-48ae-b1ef-bd28ebf0fc91
 
 ## Package details
 
