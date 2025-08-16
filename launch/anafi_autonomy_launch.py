@@ -10,7 +10,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, TimerAction
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
@@ -115,12 +115,17 @@ def generate_launch_description():
 		name='rqt_image_view',
 		arguments=[['/', LaunchConfiguration('namespace'), '/camera/image']]
 	)
-	
-	rqt_reconfigure_node = Node(
-		package='rqt_reconfigure',
-		namespace=LaunchConfiguration('namespace'),
-		executable='rqt_reconfigure',
-		name='rqt_reconfigure'
+
+	rqt_reconfigure_delayed = TimerAction(
+		period=15.0,
+		actions=[
+			Node(
+				package='rqt_reconfigure',
+				namespace=LaunchConfiguration('namespace'),
+				executable='rqt_reconfigure',
+				name='rqt_reconfigure'
+			)
+		]
 	)
 
 	return LaunchDescription([
@@ -131,5 +136,5 @@ def generate_launch_description():
 		autonomy_node,
 		trajectory_node,
 		rqt_image_view_node,
-		rqt_reconfigure_node
+		rqt_reconfigure_delayed
 	])
