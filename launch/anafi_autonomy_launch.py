@@ -117,7 +117,7 @@ def generate_launch_description():
 	)
 
 	rqt_reconfigure_delayed = TimerAction(
-		period=15.0,
+		period=5.0,
 		actions=[
 			Node(
 				package='rqt_reconfigure',
