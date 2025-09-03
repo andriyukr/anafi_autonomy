@@ -1,4 +1,4 @@
-/anafi/autonomy:
+/**:
   ros__parameters:
     gains:  # Controller gains
       position:  # Position gains

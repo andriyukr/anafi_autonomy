@@ -48,36 +48,44 @@ add_executable(autonomy
 	src/autonomy.cpp
 	src/PIDController.cpp
 )
-ament_target_dependencies(autonomy 
-	rclcpp 
-	std_msgs
-	geometry_msgs
-	sensor_msgs
-	nav_msgs
-	std_srvs
-	tf2
-	anafi_ros_interfaces)
-target_link_libraries(autonomy "${cpp_typesupport_target}" ament_index_cpp::ament_index_cpp)
+target_link_libraries(autonomy PUBLIC
+	"${cpp_typesupport_target}"
+	${anafi_ros_interfaces_TARGETS}
+	${geometry_msgs_TARGETS}
+	${nav_msgs_TARGETS}
+	${sensor_msgs_TARGETS}
+	${std_msgs_TARGETS}
+	${std_srvs_TARGETS}
+	ament_index_cpp::ament_index_cpp
+	rclcpp::rclcpp
+	sensor_msgs::sensor_msgs_library
+	tf2::tf2	
+)
 
 add_executable(keyboard src/keyboard.cpp)
-ament_target_dependencies(keyboard 
-	rclcpp 
-	std_msgs
-	geometry_msgs)
-target_link_libraries(keyboard "${cpp_typesupport_target}")
+target_link_libraries(keyboard PUBLIC
+	"${cpp_typesupport_target}"
+	${geometry_msgs_TARGETS}
+	${std_msgs_TARGETS}
+	rclcpp::rclcpp	
+)
 
 add_executable(trajectory src/trajectory.cpp)
-ament_target_dependencies(trajectory 
-	rclcpp)
-target_link_libraries(trajectory "${cpp_typesupport_target}" ament_index_cpp::ament_index_cpp)
+target_link_libraries(trajectory PUBLIC
+	"${cpp_typesupport_target}"
+	ament_index_cpp::ament_index_cpp
+	rclcpp::rclcpp
+)
 
 add_executable(example src/example.cpp)
-ament_target_dependencies(example 
-	rclcpp 
-	std_msgs
-	geometry_msgs
-	sensor_msgs)
-target_link_libraries(example "${cpp_typesupport_target}")
+target_link_libraries(example PUBLIC
+	"${cpp_typesupport_target}"
+	${geometry_msgs_TARGETS}
+	${sensor_msgs_TARGETS}
+	${std_msgs_TARGETS}
+	rclcpp::rclcpp
+	sensor_msgs::sensor_msgs_library	
+)
 
 install(TARGETS
 	autonomy
