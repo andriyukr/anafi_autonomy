@@ -1,21 +1,36 @@
 /**:
   ros__parameters:
-    fixed_frame: false                                                                            # Fixed frame for velocity commands
-    flightplan_file: ~/ros2_ws/install/anafi_autonomy/share/anafi_autonomy/missions/test.mavlink  # Absolute path to the FlightPlan file
-    followme_mode: 2                                                                              # FollowMe mode: 1 = look at the target without moving automatically, 2 = follow the target keeping the same vector, 3 = follow the target keeping the same orientation to its direction, 4 = follow the target as it was held by a leash
-    hand_launch: false                                                                            # Enable hand launched takeoff
-    landing_control: false                                                                        # Enable control during landing
-    mission_type: 0                                                                               # Mission type: 0 = flight plan, 1 = follow me
-    takingoff_control: false                                                                      # Enable control during takeoff
-    world_frame: false                                                                            # Yaw in world frame
-    bounds:
-      x:
-        min: -10.0 	# min x bound
-        max: 10.0 	# max x bound
-      y:
-        min: -10.0 	# min y bound 
-        max: 100.0 	# max y bound
-      z:
-        min: 0.0 	# min z bound 
-        max: 2.0 	# max z bound
+    armed: false
+    hand_launch: false # Enable hand launched takeoff
+    landing_control: false # Enable control during landing
+    takingoff_control: false # Enable control during takeoff
+    mission_type: 0 # Mission type: 0 = flight plan, 1 = follow me
+    start_type_description_service: true
+    use_sim_time: false
+    fixed_frame: false # Fixed frame for velocity command
+    world_frame: false # Yaw in world frame
 
+    # FollowMe mode: 
+    #   1 = look at the target without moving automatically
+    #   2 = follow the target keeping the same vector
+    #   3 = follow the target keeping the same orientation to its direction
+    #   4 = follow the target as it was held by a leash
+    follow_me/mode: 2
+
+    # Bounds
+    bounds/x/max: 10.0
+    bounds/x/min: -10.0
+    bounds/y/max: 10.0
+    bounds/y/min: -10.0
+    bounds/z/max: 2.0 #binded to anafi/drone/max_altitude
+    bounds/z/min: 0.0
+
+  
+    # QoS Settings
+    qos_overrides:
+      /parameter_events:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_last
+          reliability: reliable
