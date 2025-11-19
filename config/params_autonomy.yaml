@@ -1,14 +1,20 @@
 /**:
   ros__parameters:
     armed: false
-    hand_launch: false
-    landing_control: false
-    takingoff_control: false
-    mission_type: 0
+    hand_launch: false # Enable hand launched takeoff
+    landing_control: false # Enable control during landing
+    takingoff_control: false # Enable control during takeoff
+    mission_type: 0 # Mission type: 0 = flight plan, 1 = follow me
     start_type_description_service: true
     use_sim_time: false
-    fixed_frame: false
-    world_frame: false
+    fixed_frame: false # Fixed frame for velocity command
+    world_frame: false # Yaw in world frame
+
+    # FollowMe mode: 
+    #   1 = look at the target without moving automatically
+    #   2 = follow the target keeping the same vector
+    #   3 = follow the target keeping the same orientation to its direction
+    #   4 = follow the target as it was held by a leash
     follow_me/mode: 2
 
     # Bounds

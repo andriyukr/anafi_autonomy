@@ -1,16 +1,16 @@
 /**:
   ros__parameters:
     # Position Gains
-    gains/position/d: 0.5
-    gains/position/i: 2.0
-    gains/position/max_i: 0.1
-    gains/position/p: 2.0
+    gains/position/d: 0.5 # Position derivative gain
+    gains/position/i: 2.0 # Position integral gain
+    gains/position/max_i: 0.1 # Position max integral component
+    gains/position/p: 2.0 # Position proportional gain
 
     # Velocity Gains
-    gains/velocity/d: 3.0
-    gains/velocity/i: 1.0
-    gains/velocity/max_i: 0.5
-    gains/velocity/p: 20.0
+    gains/velocity/d: 3.0 # Velocity derivative gain
+    gains/velocity/i: 1.0 # Velocity integral gain
+    gains/velocity/max_i: 0.5 # Velocity max integral component
+    gains/velocity/p: 20.0 # Velocity proportional gain
 
     # Yaw Gains
-    gains/yaw/p: 70.0
+    gains/yaw/p: 70.0 # Yaw proportional gain
