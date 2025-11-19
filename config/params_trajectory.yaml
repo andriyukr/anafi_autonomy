@@ -1,8 +1,13 @@
 /**:
   ros__parameters:
-    trajectory: 0  # Trajectory type: 0 = no trajectory, 1 = hover at (x_current, y_current, 1, yaw_d), 2 = defined by user with (x_d, y_d, z_d, yaw_d)
-    desired:  # Desired pose
-      x: 0.0  # Desired x position
-      y: 0.0  # Desired y position
-      z: 1.0  # Desired z position
-      yaw: 90.0  # Desired yaw orientation
+  
+    desired/speed: 1.0
+    desired/x: 0.0
+    desired/y: 0.0
+    desired/z: 1.0
+    desired/yaw: 0.0
+
+    scale: 1.0
+    start_type_description_service: true
+    trajectory_type: 0
+    use_sim_time: false
